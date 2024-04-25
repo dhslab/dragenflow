@@ -28,7 +28,7 @@ workflow INPUT_CHECK {
     ch_mastersheet
     .map { meta -> 
         if (meta.read1 != null && meta.read2 != null){
-            def new_meta = meta.subMap('id', 'uid', 'sample_type','sample_id','assay')
+            def new_meta = meta.subMap('id', 'uid','sex','sample_type','sample_id','assay')
             def rgid = meta.flowcell + '.' + meta.i7index + '.' + meta.i5index + '.' + meta.lane 
             def rglb = meta.id + '.' + meta.i7index + '.' + meta.i5index
             [ new_meta, [ rgid, meta.id, rglb, meta.lane, file(meta.read1), file(meta.read2) ] ]
@@ -95,7 +95,7 @@ workflow INPUT_CHECK {
     ch_mastersheet
     .map { meta -> 
         if (meta.cram != null){
-            def new_meta = meta.subMap('id', 'uid', 'sample_type','sample_id','assay')
+            def new_meta = meta.subMap('id', 'uid','sex','sample_type','sample_id','assay')
             new_meta.cram = file(meta.cram).getName()
             [ new_meta, 'cram', [ file(meta.cram), file(meta.cram + '.crai')  ] ]
         }
@@ -108,7 +108,7 @@ workflow INPUT_CHECK {
     ch_mastersheet
     .map { meta -> 
         if (meta.bam != null){
-            def new_meta = meta.subMap('id', 'uid', 'sample_type','sample_id','assay')
+            def new_meta = meta.subMap('id', 'uid','sex','sample_type','sample_id','assay')
             new_meta.bam = file(meta.bam).getName()
             [ new_meta, 'bam', [ file(meta.bam), file(meta.bam + '.bai') ] ]
         }
@@ -128,6 +128,7 @@ def create_master_samplesheet(LinkedHashMap row) {
     def meta = [:]
     meta.id             = row.id
     meta.uid            = row.uid ?: null
+    meta.sex            = row.sex ?: null
     meta.sample_type    = row.sample_type ?: null
     meta.sample_id      = row.sample_id ?: null
     meta.assay          = row.assay ?: null
