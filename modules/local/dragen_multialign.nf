@@ -6,8 +6,7 @@ process DRAGEN_MULTIALIGN {
     publishDir "$params.outdir/${meta.id}/", saveAs: { filename -> filename == "versions.yml" ? null : filename.split('/')[1] }, mode:'copy'
 
     input:
-    tuple val(meta), path("*")
-    val(type)
+    tuple val(meta), val(type), path("*")
     tuple val(dragen_inputs), path("*", stageAs: 'inputs/*')
 
     output:
@@ -16,25 +15,33 @@ process DRAGEN_MULTIALIGN {
 
     script:
     def input = ""
-    if (type == 'fastq_list') {
+    if (type == 'fastq') {
         if (params.workflow == "rna" || params.workflow == "tumor"){
-            input = "--tumor-fastq-list fastq_list.csv --tumor-fastq-list-sample-id ${meta.id}"
+            input = "--tumor-fastq-list ${meta.id}.fastq_list.csv --tumor-fastq-list-sample-id ${meta.id}"
         } else if (params.workflow == "5mc" || params.workflow == "germline") {
-            input = "--fastq-list fastq_list.csv --fastq-list-sample-id ${meta.id}"
+            input = "--fastq-list ${meta.id}.fastq_list.csv --fastq-list-sample-id ${meta.id}"
+        } else if (params.workflow == "somatic"){
+            input = "--tumor-fastq-list ${meta.id}.fastq_list.csv --tumor-fastq-list-sample-id ${meta.tumor} --fastq-list ${meta.id}.fastq_list.csv --fastq-list-sample-id ${meta.normal}"
         }
     } else if (type == 'cram') {
         if (params.workflow == "rna" || params.workflow == "tumor"){
             input = "--tumor-cram-input ${meta.cram}"
         } else if (params.workflow == "5mc" || params.workflow == "germline") {
             input = "--cram-input ${meta.cram}"
+        } else if (params.workflow == "somatic"){
+            input = "--tumor-cram-input ${meta.tumor} --cram-input ${meta.normal}"
         }
+        input += " --cram-reference inputs/${dragen_inputs.input_cram_reference}"
     }
     if (type == 'bam') {
         if (params.workflow == "rna" || params.workflow == "tumor"){
             input = "--tumor-bam-input ${meta.bam}"
         } else if (params.workflow == "5mc" || params.workflow == "germline") {
             input = "--bam-input ${meta.bam}"
+        } else if (params.workflow == "somatic"){
+            input = "--tumor-bam-input ${meta.tumor} --bam-input ${meta.normal}"
         }
+
     }
 
     def intermediate_dir = task.ext.intermediate_dir ? "--intermediate-results-dir ${task.ext.intermediate_dir}" : ""
@@ -50,7 +57,7 @@ process DRAGEN_MULTIALIGN {
     } else if (params.workflow == "5mc"){
         dragen_mode_args = "--enable-methylation-calling true --methylation-protocol directional --methylation-generate-cytosine-report true --methylation-compress-cx-report true"
         
-    } else if (params.workflow == "tumor"){
+    } else if (params.workflow == "tumor" || params.workflow == "somatic"){
         def tandup_bed = dragen_inputs.tandem_dup_hotspot_bed != null ? "--sv-somatic-ins-tandup-hotspot-regions-bed inputs/${dragen_inputs.tandem_dup_hotspot_bed}" : ""
         def dux4caller = params.dux4caller == true ? " --enable-dux4-caller true" : ""
         def hotspotvcf = dragen_inputs.hotspot_vcf != null ? "--vc-somatic-hotspots inputs/${dragen_inputs.hotspot_vcf}" : ""
@@ -93,7 +100,7 @@ process DRAGEN_MULTIALIGN {
 
     stub:
     def input = ""
-    if (type == 'fastq_list') {
+    if (type == 'fastq') {
         if (params.workflow == "rna" || params.workflow == "tumor"){
             input = "--tumor-fastq-list fastq_list.csv --tumor-fastq-list-sample-id ${meta.id}"
         } else if (params.workflow == "5mc" || params.workflow == "germline") {

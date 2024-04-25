@@ -35,13 +35,13 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 //
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
 //
-include { INPUT_CHECK  } from '../subworkflows/local/input_check'
-include { TUMOR_NORMAL } from '../subworkflows/local/tumor_normal.nf'
-include { TUMOR        } from '../subworkflows/local/tumor.nf'
-include { GERMLINE     } from '../subworkflows/local/germline.nf'
-include { RNASEQ       } from '../subworkflows/local/rna_seq.nf'
-include { METHYLATION  } from '../subworkflows/local/methylation.nf'
-
+include { INPUT_CHECK          } from '../subworkflows/local/input_check.nf'
+include { SOMATIC_INPUT_CHECK  } from '../subworkflows/local/somatic_input_check.nf'
+include { TUMOR_NORMAL         } from '../subworkflows/local/tumor_normal.nf'
+include { TUMOR                } from '../subworkflows/local/tumor.nf'
+//include { GERMLINE             } from '../subworkflows/local/germline.nf'
+include { RNASEQ               } from '../subworkflows/local/rna_seq.nf'
+include { METHYLATION          } from '../subworkflows/local/methylation.nf'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -90,10 +90,9 @@ def stageFileset(Map filePathMap) {
 // data path because only files are given. This sets the 
 // data path to the samplesheet directory, or the data_path parameter.
 def data_path = ""
-def mastersheet = params.master_samplesheet
-if (params.mgi_samplesheet != null) {
-    mastersheet = params.mgi_samplesheet
-    data_path = new File(params.mgi_samplesheet).parentFile.absolutePath
+def mastersheet = params.mastersheet
+if (params.mgi == true) {
+    data_path = new File(params.mastersheet).parentFile.absolutePath
 } else if (params.data_path != null){
     data_path  = params.data_path
 }
@@ -104,59 +103,61 @@ def multiqc_report = []
 workflow DRAGENMULTIWORKFLOW {
 
     ch_versions     = Channel.empty()
+    ch_input_data   = Channel.empty()
 
-    INPUT_CHECK(Channel.fromPath(mastersheet), data_path)
+    if (params.workflow == 'somatic') {
 
-    fastq_list = INPUT_CHECK.out.ch_fastq_list
-    cram       = INPUT_CHECK.out.ch_cram
-    bam        = INPUT_CHECK.out.ch_bam
-  
-    fastq_list.dump()
-    cram.dump()
-    bam.dump()
+        SOMATIC_INPUT_CHECK(Channel.fromPath(mastersheet), data_path)
+        ch_input_data = ch_input_data.mix(SOMATIC_INPUT_CHECK.out.input_data)
+        ch_versions = ch_versions.mix(SOMATIC_INPUT_CHECK.out.versions)
 
-    if (params.workflow == '5mc') {
-        // Stage Dragen input files
-        params.dragen_inputs.reference = params.dragen_inputs.methylation_reference
-        params.dragen_inputs.methylation_reference = null
-        ch_dragen_inputs = Channel.value(stageFileset(params.dragen_inputs))
-
-        METHYLATION(fastq_list, cram, bam, ch_dragen_inputs)
-        ch_versions = ch_versions.mix(METHYLATION.out.ch_versions)
-
+        TUMOR_NORMAL(ch_input_data, ch_dragen_inputs)
+        ch_versions = ch_versions.mix(TUMOR_NORMAL.out.ch_versions)
+    
     } else {
 
-        params.dragen_inputs.methylation_reference = null
-        if (params.target_bed_file != null){
-            params.dragen_inputs.target_bed_file = params.target_bed_file
-        }
-        if (params.hotspot_vcf != null){
-            params.dragen_inputs.hotspot_vcf = params.hotspot_vcf
-            params.dragen_inputs.hotspot_vcf_index = params.hotspot_vcf_index
-        }
+        INPUT_CHECK(Channel.fromPath(mastersheet), data_path)
+        ch_input_data = ch_input_data.mix(INPUT_CHECK.out.input_data)
+        ch_versions = ch_versions.mix(INPUT_CHECK.out.versions)        
 
-        ch_dragen_inputs = Channel.value(stageFileset(params.dragen_inputs))
+        if (params.workflow == '5mc') {
 
-        if (params.workflow == 'rna') {
-            RNASEQ(fastq_list, cram, bam, ch_dragen_inputs)
-            ch_versions = ch_versions.mix(RNASEQ.out.ch_versions)
+            // Stage Dragen input files
+            params.dragen_inputs.reference = params.dragen_inputs.methylation_reference
+            params.dragen_inputs.methylation_reference = null
+            ch_dragen_inputs = Channel.value(stageFileset(params.dragen_inputs))
+
+            METHYLATION(ch_input_data, ch_dragen_inputs)
+            ch_versions = ch_versions.mix(METHYLATION.out.ch_versions)
+
+        } else {
+
+            params.dragen_inputs.methylation_reference = null
+            if (params.target_bed_file != null){
+                params.dragen_inputs.target_bed_file = params.target_bed_file
+            }
+            if (params.hotspot_vcf != null){
+                params.dragen_inputs.hotspot_vcf = params.hotspot_vcf
+                params.dragen_inputs.hotspot_vcf_index = params.hotspot_vcf_index
+            }
+
+            ch_dragen_inputs = Channel.value(stageFileset(params.dragen_inputs))
+
+            if (params.workflow == 'rna') {
+                RNASEQ(ch_input_data, ch_dragen_inputs)
+                ch_versions = ch_versions.mix(RNASEQ.out.ch_versions)
+            }
+
+            if (params.workflow == 'germline') {
+                //GERMLINE(ch_input_data, ch_dragen_inputs)
+                //ch_versions = ch_versions.mix(GERMLINE.out.ch_versions)
+            }
+
+            if (params.workflow == 'tumor') {
+                TUMOR(ch_input_data, ch_dragen_inputs)
+                ch_versions = ch_versions.mix(TUMOR.out.ch_versions)
+            }
         }
-
-        if (params.workflow == 'germline') {
-            GERMLINE(fastq_list, cram, bam, ch_dragen_inputs)
-            ch_versions = ch_versions.mix(GERMLINE.out.ch_versions)
-        }
-
-        if (params.workflow == 'tumor') {
-            TUMOR(fastq_list, cram, bam, ch_dragen_inputs)
-            ch_versions = ch_versions.mix(TUMOR.out.ch_versions)
-        }
-
-        if (params.workflow == 'somatic') {
-            TUMOR_NORMAL(fastq_list, cram, bam, ch_dragen_inputs)
-            ch_versions = ch_versions.mix(TUMOR_NORMAL.out.ch_versions)
-        }
-
     }
 
     CUSTOM_DUMPSOFTWAREVERSIONS (

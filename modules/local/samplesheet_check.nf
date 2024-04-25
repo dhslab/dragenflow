@@ -12,7 +12,7 @@ process SAMPLESHEET_CHECK {
     path "versions.yml"             , emit: versions
 
     script:
-    def mgi = params.mgi_samplesheet != null ? "-m " : ""
+    def mgi = params.mgi == true ? "-m " : ""
     def dir = data_path != "" ? "-d ${data_path} " : ""
     """
     check_samplesheet.py ${mgi}${dir}$samplesheet
@@ -24,7 +24,7 @@ process SAMPLESHEET_CHECK {
     """
 
     stub:
-    def mgi = params.mgi_samplesheet != null ? "-m " : ""
+    def mgi = params.mgi == true ? "-m " : ""
     def dir = data_path != "" ? "-d ${data_path} " : ""
     """
     check_samplesheet.py ${mgi}${dir}$samplesheet

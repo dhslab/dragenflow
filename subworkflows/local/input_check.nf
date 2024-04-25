@@ -8,9 +8,10 @@ workflow INPUT_CHECK {
 
     main:
 
-    ch_reads        = Channel.empty()
-    ch_cram         = Channel.empty()
-    ch_bam          = Channel.empty()
+    ch_mastersheet        = Channel.empty()
+    ch_input_data         = Channel.empty()
+    ch_dragen_outputs     = Channel.empty()
+    ch_versions           = Channel.empty()
 
     // Runs a python script that parses the sample sheet and adds key metadata, 
     // including index sequences, flowcell, and lane. If fastq_list.csv files are passed,
@@ -21,11 +22,13 @@ workflow INPUT_CHECK {
     .map { create_master_samplesheet(it) }
     .set { ch_mastersheet }
 
+    ch_versions = ch_versions.mix(SAMPLESHEET_CHECK.out.versions)
+
     // Organize reads into a fastq list string (to be written to a file) and read1/read2 pairs.
     ch_mastersheet
     .map { meta -> 
         if (meta.read1 != null && meta.read2 != null){
-            def new_meta = meta.subMap('id', 'uid', 'sample', 'assay')
+            def new_meta = meta.subMap('id', 'uid', 'sample_type','sample_id','assay')
             def rgid = meta.flowcell + '.' + meta.i7index + '.' + meta.i5index + '.' + meta.lane 
             def rglb = meta.id + '.' + meta.i7index + '.' + meta.i5index
             [ new_meta, [ rgid, meta.id, rglb, meta.lane, file(meta.read1), file(meta.read2) ] ]
@@ -48,6 +51,25 @@ workflow INPUT_CHECK {
     }
     .set { ch_fastqs }
 
+    ch_fastqs
+    .collectFile{ meta, fqlist, read1, read2 -> 
+        [ "${meta.id}.fastq_list.csv", fqlist + '\n' ]
+    }
+    .map { fqfile -> 
+        [ fqfile.getName().toString().split('\\.')[0], file(fqfile) ]
+    }
+    .set { ch_fastq_list_files }
+
+    ch_fastqs
+    .map { meta, fqlist, read1, read2 ->
+        [ meta.id, meta ]
+    }
+    .join(ch_fastq_list_files)
+    .map { id, meta, fqlist -> 
+        [ meta, fqlist ]
+    }
+    .set { ch_fastq_lists }
+
     // Put read1 and read2 files into separate channels.
     ch_fastqs
     .map { meta, fqlist, read1, read2 -> [ meta, read1 ] }
@@ -59,50 +81,55 @@ workflow INPUT_CHECK {
     .transpose()
     .set { ch_read2 }
 
-    // Make fastq_list file from string.
-    ch_fastqs
-    .map { meta, fqlist, read1, read2 -> [ meta, fqlist ] } | MAKE_FASTQLIST
-
-    // Concatenate read1, read2, and fastqlist channels and group by meta.
-    MAKE_FASTQLIST.out.fastq_list
+    ch_fastq_lists
     .concat(ch_read1,ch_read2)
     .groupTuple()
+    .map { meta, files -> 
+        [ meta, "fastq", files ] 
+    }
     .set { ch_fastq_list }
+
+    ch_input_data = ch_input_data.mix(ch_fastq_list)
 
     // Organize cram files into a channel.
     ch_mastersheet
     .map { meta -> 
         if (meta.cram != null){
-            def new_meta = meta.subMap('id', 'uid', 'sample', 'assay')
+            def new_meta = meta.subMap('id', 'uid', 'sample_type','sample_id','assay')
             new_meta.cram = file(meta.cram).getName()
-            [ new_meta, [ file(meta.cram), file(meta.cram + '.crai')  ] ]
+            [ new_meta, 'cram', [ file(meta.cram), file(meta.cram + '.crai')  ] ]
         }
     }
     .set { ch_cram }
+
+    ch_input_data = ch_input_data.mix(ch_cram)
 
     // Organize bam files into a channel.
     ch_mastersheet
     .map { meta -> 
         if (meta.bam != null){
-            def new_meta = meta.subMap('id', 'uid', 'sample', 'assay')
+            def new_meta = meta.subMap('id', 'uid', 'sample_type','sample_id','assay')
             new_meta.bam = file(meta.bam).getName()
-            [ new_meta, [ file(meta.bam), file(meta.bam + '.bai') ] ]
+            [ new_meta, 'bam', [ file(meta.bam), file(meta.bam + '.bai') ] ]
         }
     }
     .set { ch_bam }
 
+    ch_input_data = ch_input_data.mix(ch_bam)
+
     emit:
-    ch_fastq_list
-    ch_cram
-    ch_bam
+    input_data = ch_input_data
+    versions = ch_versions
+
 }
 
 def create_master_samplesheet(LinkedHashMap row) {
 
     def meta = [:]
     meta.id             = row.id
-    meta.uid            = row.uid ?: row.sample_id
-    meta.sample         = row.sample ?: null
+    meta.uid            = row.uid ?: null
+    meta.sample_type    = row.sample_type ?: null
+    meta.sample_id      = row.sample_id ?: null
     meta.assay          = row.assay ?: null
     meta.i7index        = row.i7index ?: null
     meta.i5index        = row.i5index ?: null

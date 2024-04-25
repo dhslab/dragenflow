@@ -1,25 +1,15 @@
-include { DRAGEN_MULTIALIGN as DRAGEN_FASTQ_LIST    } from '../../modules/local/dragen_multialign.nf'
-include { DRAGEN_MULTIALIGN as DRAGEN_CRAM          } from '../../modules/local/dragen_multialign.nf'
-include { DRAGEN_MULTIALIGN as DRAGEN_BAM           } from '../../modules/local/dragen_multialign.nf'
+include { DRAGEN_MULTIALIGN    } from '../../modules/local/dragen_multialign.nf'
 
 workflow METHYLATION {
     take:
-    fastq_list
-    cram
-    bam
+    input_data
     dragen_inputs
 
     main:
     ch_versions = Channel.empty()
 
-    DRAGEN_FASTQ_LIST(fastq_list, 'fastq_list', dragen_inputs)
+    DRAGEN_MULTIALIGN(input_data, dragen_inputs)
     ch_versions = ch_versions.mix(DRAGEN_FASTQ_LIST.out.versions)
-
-    DRAGEN_CRAM(cram, 'cram', dragen_inputs)
-    ch_versions = ch_versions.mix(DRAGEN_CRAM.out.versions)
-
-    DRAGEN_BAM(bam, 'bam', dragen_inputs)
-    ch_versions = ch_versions.mix(DRAGEN_BAM.out.versions)
 
     emit: 
     ch_versions
