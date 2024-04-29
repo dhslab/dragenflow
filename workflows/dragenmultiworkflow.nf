@@ -37,7 +37,7 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 //
 include { INPUT_CHECK          } from '../subworkflows/local/input_check.nf'
 include { SOMATIC_INPUT_CHECK  } from '../subworkflows/local/somatic_input_check.nf'
-include { TUMOR_NORMAL         } from '../subworkflows/local/tumor_normal.nf'
+include { SOMATIC              } from '../subworkflows/local/somatic.nf'
 include { TUMOR                } from '../subworkflows/local/tumor.nf'
 //include { GERMLINE             } from '../subworkflows/local/germline.nf'
 include { RNASEQ               } from '../subworkflows/local/rna_seq.nf'
@@ -109,10 +109,20 @@ workflow DRAGENMULTIWORKFLOW {
 
         SOMATIC_INPUT_CHECK(Channel.fromPath(mastersheet), data_path)
         ch_input_data = ch_input_data.mix(SOMATIC_INPUT_CHECK.out.input_data)
-        ch_versions = ch_versions.mix(SOMATIC_INPUT_CHECK.out.versions)
 
-        TUMOR_NORMAL(ch_input_data, ch_dragen_inputs)
-        ch_versions = ch_versions.mix(TUMOR_NORMAL.out.ch_versions)
+        params.dragen_inputs.methylation_reference = null
+        if (params.target_bed_file != null){
+            params.dragen_inputs.target_bed_file = params.target_bed_file
+        }
+        if (params.hotspot_vcf != null){
+            params.dragen_inputs.hotspot_vcf = params.hotspot_vcf
+            params.dragen_inputs.hotspot_vcf_index = params.hotspot_vcf_index
+        }
+
+        ch_dragen_inputs = Channel.value(stageFileset(params.dragen_inputs))
+
+        SOMATIC(ch_input_data, ch_dragen_inputs)
+        ch_versions = ch_versions.mix(SOMATIC.out.versions)
     
     } else {
 

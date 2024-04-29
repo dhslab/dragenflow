@@ -15,7 +15,9 @@ workflow TUMOR {
     ch_versions = ch_versions.mix(DRAGEN_TUMOR.out.versions)
 
     ANNOTATE_SMALLVARIANTS(ch_dragen_output, Channel.fromPath(params.fasta), Channel.fromPath(params.vepcache))
+    ch_versions = ch_versions.mix(ANNOTATE_SMALLVARIANTS.out.versions)
 
     emit:
+    dragen_output = ch_dragen_output
     ch_versions
 }
