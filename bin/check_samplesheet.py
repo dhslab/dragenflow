@@ -101,7 +101,7 @@ def reformat_mgi_samplesheet(file,filepath):
     df[['i7index', 'i5index']] = df['Index Sequence'].str.split('-', expand=True)
     df[['uid', 'sample','assay']] = df['Library Name'].str.split('-', expand=True)[[0,1,2]]
     df[['id','flowcell', 'lane']] = df[['Library Name','Flowcell ID', 'Flowcell Lane']]
-    df = df[['id','uid','sample','sample_id','assay','i7index', 'i5index','flowcell', 'lane','read1','read2']]
+    df = df[['id','uid','sample','assay','i7index', 'i5index','flowcell', 'lane','read1','read2']]
 
     return df
 

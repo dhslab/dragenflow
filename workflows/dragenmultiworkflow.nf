@@ -138,7 +138,7 @@ workflow DRAGENMULTIWORKFLOW {
             ch_dragen_inputs = Channel.value(stageFileset(params.dragen_inputs))
 
             METHYLATION(ch_input_data, ch_dragen_inputs)
-            ch_versions = ch_versions.mix(METHYLATION.out.ch_versions)
+            ch_versions = ch_versions.mix(METHYLATION.out.versions)
 
         } else {
 
@@ -155,7 +155,7 @@ workflow DRAGENMULTIWORKFLOW {
 
             if (params.workflow == 'rna') {
                 RNASEQ(ch_input_data, ch_dragen_inputs)
-                ch_versions = ch_versions.mix(RNASEQ.out.ch_versions)
+                ch_versions = ch_versions.mix(RNASEQ.out.versions)
             }
 
             if (params.workflow == 'germline') {
@@ -165,7 +165,7 @@ workflow DRAGENMULTIWORKFLOW {
 
             if (params.workflow == 'tumor') {
                 TUMOR(ch_input_data, ch_dragen_inputs)
-                ch_versions = ch_versions.mix(TUMOR.out.ch_versions)
+                ch_versions = ch_versions.mix(TUMOR.out.versions)
             }
         }
     }
