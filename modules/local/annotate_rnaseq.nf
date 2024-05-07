@@ -17,7 +17,7 @@ process ANNOTATE_RNASEQ {
     script:
     """
     add_genename_todragenrna.py -i ${meta.id}.quant.genes.sf -d inputs/${dragen_inputs.transcript_table} -o ${meta.id}.quant.genes.annotated.tsv && \\
-    add_genename_todragenrna.py -i ${meta.id}.quant.sf -d inputs/${dragen_inputs.transcript_table} -o ${meta.id}.quant.annotated.tsv
+    add_genename_todragenrna.py -t -i ${meta.id}.quant.sf -d inputs/${dragen_inputs.transcript_table} -o ${meta.id}.quant.annotated.tsv
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

@@ -19,12 +19,12 @@ def main():
     
     transcripts = pd.DataFrame()
     if args.transcripts:
-        transcripts = pd.read_csv(args.database,sep="\t")[["transcript_id","transcript_name"]].drop_duplicates()
+        transcripts = pd.read_csv(args.database,sep="\t")[["transcript_id","gene_id","gene_name","transcript_name"]].drop_duplicates()
         trx_expression = pd.read_csv(args.input,sep="\t")
         outdf = trx_expression.merge(transcripts,left_on="Name",right_on="transcript_id",how="left")
         outdf.loc[outdf['transcript_name'].isna(),"transcript_name"] = outdf.loc[outdf['transcript_name'].isna(),"transcript_id"]
-        outdf.rename(columns={'Name':'Id','transcript_name':'Name'},inplace=True)
-        outdf["Id Name Length EffectiveLength TPM NumReads".split(" ")].to_csv(args.outfile,sep="\t",index=False)
+        outdf.rename(columns={'Name':'Id','transcript_name':'Name','gene_id':'GeneId','gene_name':'GeneName'},inplace=True)
+        outdf["Id Name GeneId GeneName Length EffectiveLength TPM NumReads".split(" ")].to_csv(args.outfile,sep="\t",index=False)
 
     else:
         transcripts = pd.read_csv(args.database,sep="\t")[["gene_id","gene_name"]].drop_duplicates()

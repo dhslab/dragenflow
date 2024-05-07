@@ -13,7 +13,7 @@ workflow RNASEQ {
     DRAGEN_RNA(input_data, dragen_inputs)
     ch_versions = ch_versions.mix(DRAGEN_RNA.out.versions)
 
-    ANNOTATE_RNASEQ(ch_dragen_output, dragen_inputs)
+    ANNOTATE_RNASEQ(DRAGEN_RNA.out.dragen_output, dragen_inputs)
     ch_versions = ch_versions.mix(ANNOTATE_RNASEQ.out.versions)
     
     emit:
