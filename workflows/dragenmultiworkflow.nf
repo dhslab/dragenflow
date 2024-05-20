@@ -39,6 +39,7 @@ include { INPUT_CHECK          } from '../subworkflows/local/input_check.nf'
 include { SOMATIC_INPUT_CHECK  } from '../subworkflows/local/somatic_input_check.nf'
 include { SOMATIC              } from '../subworkflows/local/somatic.nf'
 include { TUMOR                } from '../subworkflows/local/tumor.nf'
+include { ALIGN                } from '../subworkflows/local/align.nf'
 //include { GERMLINE             } from '../subworkflows/local/germline.nf'
 include { RNASEQ               } from '../subworkflows/local/rna_seq.nf'
 include { METHYLATION          } from '../subworkflows/local/methylation.nf'
@@ -167,6 +168,12 @@ workflow DRAGENMULTIWORKFLOW {
                 TUMOR(ch_input_data, ch_dragen_inputs)
                 ch_versions = ch_versions.mix(TUMOR.out.versions)
             }
+
+            if (params.workflow == 'align') {
+                ALIGN(ch_input_data, ch_dragen_inputs)
+                ch_versions = ch_versions.mix(ALIGN.out.versions)
+            }
+
         }
     }
 

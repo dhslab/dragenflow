@@ -18,7 +18,7 @@ process DRAGEN_MULTIALIGN {
     if (type == 'fastq') {
         if (params.workflow == "rna" || params.workflow == "tumor"){
             input = "--tumor-fastq-list ${meta.id}.fastq_list.csv --tumor-fastq-list-sample-id ${meta.id}"
-        } else if (params.workflow == "5mc" || params.workflow == "germline") {
+        } else if (params.workflow == "5mc" || params.workflow == "germline" || params.workflow == "align") {
             input = "--fastq-list ${meta.id}.fastq_list.csv --fastq-list-sample-id ${meta.id}"
         } else if (params.workflow == "somatic"){
             input = "--tumor-fastq-list ${meta.id}.fastq_list.csv --tumor-fastq-list-sample-id ${meta.tumor} --fastq-list ${meta.id}.fastq_list.csv --fastq-list-sample-id ${meta.normal}"
@@ -26,7 +26,7 @@ process DRAGEN_MULTIALIGN {
     } else if (type == 'cram') {
         if (params.workflow == "rna" || params.workflow == "tumor"){
             input = "--tumor-cram-input ${meta.cram}"
-        } else if (params.workflow == "5mc" || params.workflow == "germline") {
+        } else if (params.workflow == "5mc" || params.workflow == "germline" || params.workflow == "align") {
             input = "--cram-input ${meta.cram}"
         } else if (params.workflow == "somatic"){
             input = "--tumor-cram-input ${meta.tumor} --cram-input ${meta.normal}"
@@ -36,7 +36,7 @@ process DRAGEN_MULTIALIGN {
     if (type == 'bam') {
         if (params.workflow == "rna" || params.workflow == "tumor"){
             input = "--tumor-bam-input ${meta.bam}"
-        } else if (params.workflow == "5mc" || params.workflow == "germline") {
+        } else if (params.workflow == "5mc" || params.workflow == "germline" || params.workflow == "align") {
             input = "--bam-input ${meta.bam}"
         } else if (params.workflow == "somatic"){
             input = "--tumor-bam-input ${meta.tumor} --bam-input ${meta.normal}"
@@ -75,7 +75,10 @@ process DRAGEN_MULTIALIGN {
         } else {
             dragen_mode_args += "--enable-cnv true --cnv-enable-self-normalization true --enable-cyp2b6 true --enable-cyp2d6 true --enable-gba true --enable-smn true --repeat-genotype-enable true"
         }
+    } else if (params.workflow == "align"){
+        dragen_mode_args = "--enable-variant-caller false --enable-sv false"
     }
+
     """
     mkdir dragen && \\
     /opt/edico/bin/dragen -r inputs/${dragen_inputs.reference} ${specified_sex} ${input} ${intermediate_dir} ${args_license}\\
@@ -103,7 +106,7 @@ process DRAGEN_MULTIALIGN {
     if (type == 'fastq') {
         if (params.workflow == "rna" || params.workflow == "tumor"){
             input = "--tumor-fastq-list fastq_list.csv --tumor-fastq-list-sample-id ${meta.id}"
-        } else if (params.workflow == "5mc" || params.workflow == "germline") {
+        } else if (params.workflow == "5mc" || params.workflow == "germline" || params.workflow == "align") {
             input = "--fastq-list fastq_list.csv --fastq-list-sample-id ${meta.id}"
         }
     } else if (type == 'cram') {
@@ -116,7 +119,7 @@ process DRAGEN_MULTIALIGN {
     if (type == 'bam') {
         if (params.workflow == "rna" || params.workflow == "tumor"){
             input = "--tumor-bam-input *.bam"
-        } else if (params.workflow == "5mc" || params.workflow == "germline") {
+        } else if (params.workflow == "5mc" || params.workflow == "germline" || params.workflow == "align") {
             input = "--bam-input *.bam"
         }
     }
@@ -153,7 +156,10 @@ process DRAGEN_MULTIALIGN {
         } else {
             dragen_mode_args += "--enable-cnv true --cnv-enable-self-normalization true --enable-cyp2b6 true --enable-cyp2d6 true --enable-gba true --enable-smn true --repeat-genotype-enable true"
         }
+    } else if (params.workflow == "align"){
+        dragen_mode_args = "--enable-variant-caller false --enable-sv false"
     }
+
     """
     mkdir dragen && \\
     echo /opt/edico/bin/dragen -r inputs/${dragen_inputs.reference} ${input} ${intermediate_dir} ${args_license}\\
