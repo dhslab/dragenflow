@@ -1,6 +1,6 @@
 process SAMPLESHEET_CHECK {
     tag "$samplesheet"
-    label 'process_single'
+    label 'process_local'
     container "ghcr.io/dhslab/docker-cleutils:240129"
 
     input:

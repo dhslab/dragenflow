@@ -1,5 +1,4 @@
 include { SAMPLESHEET_CHECK              } from '../../modules/local/samplesheet_check.nf'
-include { MAKE_FASTQLIST                 } from '../../modules/local/make_fastqlist.nf'
 
 workflow SOMATIC_INPUT_CHECK {
     take:
@@ -147,7 +146,7 @@ workflow SOMATIC_INPUT_CHECK {
         meta['normal'] = normal.findAll { it != '' }.unique()[0]
         return [ meta, 'cram', crams ]
     }
-    .filter { it.tumor != "" && it.normal != "" }
+    .filter { it[0].tumor != "" && it[0].normal != "" }
     .set { ch_cram }
 
     ch_input_data = ch_input_data.mix(ch_cram)
@@ -160,19 +159,19 @@ workflow SOMATIC_INPUT_CHECK {
             new_meta['id'] = meta.uid
             new_meta['assay'] = meta.assay
             if (meta.sample_type == 'tumor'){
-                return [ new_meta, file(meta.bam).getName(), '', [ file(meta.bam), file(meta.bam + '.crai') ] ]
+                return [ new_meta, file(meta.bam).getName(), '', [ file(meta.bam), file(meta.bam + '.bai') ] ]
             } else if (meta.sample_type == 'normal'){
-                return [ new_meta, '', file(meta.bam).getName(), [ file(meta.bam), file(meta.bam + '.crai') ] ]
+                return [ new_meta, '', file(meta.bam).getName(), [ file(meta.bam), file(meta.bam + '.bai') ] ]
             }
         }
     }
-    .groupTuple()
+    .groupTuple(by:0)
     .map { meta, tumor, normal, bams ->
         meta['tumor'] = tumor.findAll { it != '' }.unique()[0]
         meta['normal'] = normal.findAll { it != '' }.unique()[0]
-        return [ meta, 'bam', bams ]
+        return [ meta, 'bam', bams.flatten() ]
     }
-    .filter { it.tumor != "" && it.normal != "" }
+    .filter { it[0].tumor != "" && it[0].normal != "" }
     .set { ch_bam }
 
     ch_input_data = ch_input_data.mix(ch_bam)
