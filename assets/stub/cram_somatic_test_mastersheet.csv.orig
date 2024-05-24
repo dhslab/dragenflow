@@ -1,0 +1,3 @@
+id,uid,sample_type,bam,cram
+10929-BM-lib1,SOMATICTEST,tumor,REPLACEPATH/crams/10929-BM-lib1_input.bam,
+10940-BM-lib1,SOMATICTEST,normal,,REPLACEPATH/crams/10940-BM-lib1_input.cram

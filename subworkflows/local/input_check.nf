@@ -1,6 +1,73 @@
 include { SAMPLESHEET_CHECK              } from '../../modules/local/samplesheet_check.nf'
 include { MAKE_FASTQLIST                 } from '../../modules/local/make_fastqlist.nf'
 
+def create_master_samplesheet(LinkedHashMap row) {
+
+    // create meta map
+    def meta = [:]
+
+    def meta = [:]
+    meta.id             = row.id
+    meta.uid            = row.uid ?: null
+    meta.sample_type    = row.sample_type ?: null
+    meta.sample_id      = row.sample_id ?: null
+    meta.assay          = row.assay ?: null
+
+    def obj = [:]
+
+    obj.indexes = row.lane && row.i7index && row.i5index ? [ lane:row.lane, i7index:row.i7index, i5index:row.i5index ] : null
+    obj.fastq_list = row.fastq_list ? row.fastq_list : null
+    obj.demux_path = row.demux_path ? row.demux_path : null
+    obj.reads = row.read1 && row.read2 ? [ read1:row.read1, read2:row.read2 ] : null
+    obj.cram = row.cram ? row.cram : null
+    obj.dragen_path = row.dragen_path ? row.dragen_path : null
+
+    return [ meta, obj ] //indexes, fastq_list, demux_path, reads, cram, dragen_path ]
+
+}
+
+// Function to merge multiple LinkedHashMaps into lists by key using the '<<' operator
+LinkedHashMap merge_maps(List<LinkedHashMap> maps) {
+    LinkedHashMap result = new LinkedHashMap()
+    count = 0
+    maps.each { map ->
+        map.each { key, value ->
+            if (value != null){        
+                if (result.containsKey(key) && result[key] != null) {
+                    result[key] << value
+                } else {
+                    result[key] = [value]
+                    count++
+                }
+            }
+        }
+    }
+    result['count'] = count
+    return result
+}
+
+def parseCSV(filePath) {
+    List<Map<String, String>> data = []
+
+    // Read the file and split each line
+    filePath.withReader { reader ->
+        // Read the header line to use as keys for the map
+        def headers = reader.readLine().split(',')
+
+        // Process each subsequent line
+        reader.splitEachLine(',') { values ->
+            def row = [:]
+            headers.eachWithIndex { header, i ->
+                row[header.trim()] = values[i].trim()
+            }
+            data.add(row)
+        }
+    }
+
+    return data
+}
+
+
 workflow INPUT_CHECK {
     take:
     master_samplesheet

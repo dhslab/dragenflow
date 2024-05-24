@@ -19,5 +19,5 @@ workflow TUMOR {
 
     emit:
     dragen_output = ch_dragen_output
-    ch_versions
+    versions = ch_versions
 }

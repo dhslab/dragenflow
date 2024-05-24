@@ -1,4 +1,72 @@
 include { SAMPLESHEET_CHECK              } from '../../modules/local/samplesheet_check.nf'
+include { GATHER_FASTQS                  } from '../../subworkflows/local/gather_fastqs.nf'
+
+def create_master_samplesheet(LinkedHashMap row) {
+
+    // create meta map
+    def meta = [:]
+
+    def meta = [:]
+    meta.id             = row.id
+    meta.uid            = row.uid ?: null
+    meta.sample_type    = row.sample_type ?: null
+    meta.sample_id      = row.sample_id ?: null
+    meta.assay          = row.assay ?: null
+
+    def obj = [:]
+
+    obj.indexes = row.lane && row.i7index && row.i5index ? [ lane:row.lane, i7index:row.i7index, i5index:row.i5index ] : null
+    obj.fastq_list = row.fastq_list ? row.fastq_list : null
+    obj.demux_path = row.demux_path ? row.demux_path : null
+    obj.reads = row.read1 && row.read2 ? [ read1:row.read1, read2:row.read2 ] : null
+    obj.cram = row.cram ? row.cram : null
+    obj.dragen_path = row.dragen_path ? row.dragen_path : null
+
+    return [ meta, obj ] //indexes, fastq_list, demux_path, reads, cram, dragen_path ]
+
+}
+
+// Function to merge multiple LinkedHashMaps into lists by key using the '<<' operator
+LinkedHashMap merge_maps(List<LinkedHashMap> maps) {
+    LinkedHashMap result = new LinkedHashMap()
+    count = 0
+    maps.each { map ->
+        map.each { key, value ->
+            if (value != null){        
+                if (result.containsKey(key) && result[key] != null) {
+                    result[key] << value
+                } else {
+                    result[key] = [value]
+                    count++
+                }
+            }
+        }
+    }
+    result['count'] = count
+    return result
+}
+
+def parseCSV(filePath) {
+    List<Map<String, String>> data = []
+
+    // Read the file and split each line
+    filePath.withReader { reader ->
+        // Read the header line to use as keys for the map
+        def headers = reader.readLine().split(',')
+
+        // Process each subsequent line
+        reader.splitEachLine(',') { values ->
+            def row = [:]
+            headers.eachWithIndex { header, i ->
+                row[header.trim()] = values[i].trim()
+            }
+            data.add(row)
+        }
+    }
+
+    return data
+}
+
 
 workflow SOMATIC_INPUT_CHECK {
     take:
@@ -21,7 +89,7 @@ workflow SOMATIC_INPUT_CHECK {
     .csv
     .splitCsv ( header:true, sep:',' )
     .map { create_master_samplesheet(it) }
-    .map { meta -> 
+    .map { meta, inputs -> 
         if (meta.id == params.tumorid){
             meta.sample_type = 'tumor'
             meta.uid = params.id
@@ -29,158 +97,76 @@ workflow SOMATIC_INPUT_CHECK {
             meta.sample_type = 'normal'
             meta.uid = params.id
         }   
-        return meta 
+        return [ meta, inputs ]
     }
-    .filter { it.sample_type != null || it.dragen_path != null }
+    .filter { it[0].sample_type != null || it[0].dragen_path != null }
+    .groupTuple()
+    .map { meta, inputs -> 
+        def new_inputs = merge_maps(inputs)
+        meta.count = new_inputs.count
+        [ meta, new_inputs ] 
+    }
     .set { ch_mastersheet }
 
-    ch_mastersheet.dump()
+    // we need fastq lists for somatic mode. Cant align 2 cram/bam files. 
+    // Gather fastqs returns [ meta, fastq_list] 
+    GATHER_FASTQS ( ch_mastersheet )
+
+    ch_fastq_lists
+    .map { meta, fqlist -> 
+        def key = groupKey(meta, meta.count)
+        [ key, fqlist ]
+    }
+    .groupTuple() | CONCATENATE_FASTQLISTS // this is done with a process because otherwise it could wait for the group to fill */
+
+    CONCATENATE_FASTQLISTS.out.fastqlist
+    .map { meta, fastqlist ->
+        def files = [ file(fastqlist) ]
+        def listdata = parseCSV(file(fastqlist))
+        listdata.each { row ->
+            if (row.containsKey('Read1File')) {
+                files.add(file(row['Read1File']))
+            }
+            if (row.containsKey('Read2File')) {
+                files.add(file(row['Read2File']))
+            }
+        }
+        [ meta, files ]
+    }
+    .set { ch_align_inputs }
     
     // get read info for fastq_list file generation
     ch_mastersheet
-    .map { meta -> 
-        if (meta.read1 != null && meta.read2 != null){
-            def new_meta = [:]
-            new_meta['id'] = meta.uid
-            new_meta['assay'] = meta.assay
-            def sample_id = ""
-            if (meta.sample_id != null){
-                sample_id = '.' + meta.sample_id
-            }
-            def rgid = meta.flowcell + sample_id + '.' + meta.i7index + '.' + meta.i5index + '.' + meta.lane 
-            def rglb = meta.id + '.' + meta.i7index + '.' + meta.i5index
-            tumor_id = ""
-            normal_id = ""
-            if (meta.sample_type == 'tumor'){
-                tumor_id = meta.id
-            } else if (meta.sample_type == 'normal'){
-                normal_id = meta.id
-            }
-
-            [ new_meta, tumor_id, normal_id, [ rgid, meta.id, rglb, meta.lane, file(meta.read1), file(meta.read2) ] ]
+    .map { meta, files -> 
+        def new_meta = [:]
+        new_meta['id'] = meta.uid
+        new_meta['assay'] = meta.assay
+        tumor_id = ""
+        normal_id = ""
+        if (meta.sample_type == 'tumor'){
+            tumor_id = meta.id
+        } else if (meta.sample_type == 'normal'){
+            normal_id = meta.id
         }
+
+        [ new_meta, tumor_id, normal_id, files ]
     }
-    .groupTuple()
-    .map { meta, tumor, normal, fqlist -> 
+    .groupTuple(by:0, size=2)
+    .map { meta, tumor, normal, files -> 
             new_meta = meta.subMap('id', 'assay')
             new_meta['tumor'] = tumor.findAll { it != '' }.unique()[0]
             new_meta['normal'] = normal.findAll { it != '' }.unique()[0]
 
-            def fileList = ['RGID,RGSM,RGLB,Lane,Read1File,Read2File']
-            def read1 = []
-            def read2 = []
-
-            // Create data rows
-            for (int i = 0; i < fqlist.size(); i++) {
-                def row = fqlist[i]
-                read1 << file(row[4])
-                read2 << file(row[5])
-                fileList << [ row[0], row[1], row[2], row[3], row[4].toString().split('/')[-1], row[5].toString().split('/')[-1] ].join(',')
-            }
-            return [ new_meta, fileList.join('\n'), read1, read2 ]
+            return [ new_meta, files.flatten() ]
     }
     .filter { it[0].tumor != "" && it[0].normal != "" }
     .set { ch_fastqs }
 
-    // create fastq_list files
-    ch_fastqs
-    .collectFile{ meta, fqlist, read1, read2 -> 
-        [ "${meta.id}.fastq_list.csv", fqlist + '\n' ]
-    }
-    .map { fqfile -> 
-        [ fqfile.getName().toString().split('\\.')[0], file(fqfile) ]
-    }
-    .set { ch_fastq_list_files }
-
-    // get meta info, keyed by meta.id and link to fastq_list files
-    ch_fastqs
-    .map { meta, fqlist, read1, read2 ->
-        [ meta.id, meta ]
-    }
-    .join(ch_fastq_list_files)
-    .map { id, meta, fqlist -> 
-        [ meta, fqlist ]
-    }
-    .set { ch_fastq_lists }
-
-    // get read1 and read2 lists
-    ch_fastqs
-    .map { meta, fqlist, read1, read2 -> [ meta, read1 ] }
-    .transpose()
-    .set { ch_read1 }
-
-    ch_fastqs
-    .map { meta, fqlist, read1, read2 -> [ meta, read2 ] }
-    .transpose()
-    .set { ch_read2 }
-
-    // collect fastq_list files and read1/read2 lists into a single channel, keyed by meta
-    ch_fastq_lists
-    .concat(ch_read1,ch_read2)
-    .groupTuple()
-    .map { meta, files -> 
-        [ meta, "fastq", files ] 
-    }
-    .set { ch_fastq_list }
-
-    ch_input_data = ch_input_data.mix(ch_fastq_list)
-
-    // Organize cram files into a channel.
-    // this saves the cram file names as values and the files as a list of files
     ch_mastersheet
-    .map { meta -> 
-        if (meta.cram != null){
-            def new_meta = [:]
-            new_meta['id'] = meta.uid
-            new_meta['assay'] = meta.assay
-            if (meta.sample_type == 'tumor'){
-                return [ new_meta, file(meta.cram).getName(), '', [ file(meta.cram), file(meta.cram + '.crai') ] ]
-            } else if (meta.sample_type == 'normal'){
-                return [ new_meta, '', file(meta.cram).getName(), [ file(meta.cram), file(meta.cram + '.crai') ] ]
-            }
-        }
-    }
-    .groupTuple()
-    .map { meta, tumor, normal, crams ->
-        meta['tumor'] = tumor.findAll { it != '' }.unique()[0]
-        meta['normal'] = normal.findAll { it != '' }.unique()[0]
-        return [ meta, 'cram', crams ]
-    }
-    .filter { it[0].tumor != "" && it[0].normal != "" }
-    .set { ch_cram }
-
-    ch_input_data = ch_input_data.mix(ch_cram)
-
-    // Organize bam files into a channel.
-    ch_mastersheet
-    .map { meta -> 
-        if (meta.bam != null){
-            def new_meta = [:]
-            new_meta['id'] = meta.uid
-            new_meta['assay'] = meta.assay
-            if (meta.sample_type == 'tumor'){
-                return [ new_meta, file(meta.bam).getName(), '', [ file(meta.bam), file(meta.bam + '.bai') ] ]
-            } else if (meta.sample_type == 'normal'){
-                return [ new_meta, '', file(meta.bam).getName(), [ file(meta.bam), file(meta.bam + '.bai') ] ]
-            }
-        }
-    }
-    .groupTuple(by:0)
-    .map { meta, tumor, normal, bams ->
-        meta['tumor'] = tumor.findAll { it != '' }.unique()[0]
-        meta['normal'] = normal.findAll { it != '' }.unique()[0]
-        return [ meta, 'bam', bams.flatten() ]
-    }
-    .filter { it[0].tumor != "" && it[0].normal != "" }
-    .set { ch_bam }
-
-    ch_input_data = ch_input_data.mix(ch_bam)
-
-    ch_mastersheet
-    .map { meta -> 
-        if (meta.dragen_path != null){
-            def new_meta = meta.subMap('id','assay','dragen_path')
-            return [ new_meta, file(meta.dragen_path).listFiles() ]
+    .map { meta, inputs -> 
+        if (inputs.dragen_path != null){
+            def new_meta = meta.subMap('id','assay')
+            return [ new_meta, file(inputs.dragen_path).listFiles() ]
         }
     }
     .set { ch_dragen_outputs }
@@ -188,65 +174,4 @@ workflow SOMATIC_INPUT_CHECK {
     emit:
     dragen_outputs = ch_dragen_outputs
     input_data = ch_input_data
-}
-
-def create_master_samplesheet(LinkedHashMap row) {
-
-    def meta = [:]
-    meta.id             = row.id
-    meta.uid            = row.uid ?: null
-    meta.sample_type    = row.sample_type ?: null
-    meta.sample_id      = row.sample_id ?: null
-    meta.assay          = row.assay ?: null
-    meta.i7index        = row.i7index ?: null
-    meta.i5index        = row.i5index ?: null
-    meta.flowcell       = row.flowcell ?: null
-    meta.lane           = row.lane ?: null
-    meta.dragen_path    = null
-    meta.read1          = null
-    meta.read2          = null
-    meta.cram           = null
-    meta.bam            = null
-
-    if (row.fastq_list) {
-        if (!file(row.fastq_list).exists()) {
-        exit 1, "ERROR: Please check input samplesheet -> fastq_list does not exist!\n${row.fastq_list}"
-        }
-        meta.fastq_list = file(row.fastq_list)
-    }
-
-    if (row.dragen_path) {
-        if (!file(row.dragen_path).exists()) {
-        exit 1, "ERROR: Please check input samplesheet -> dragen_path does not exist!\n${row.dragen_path}"
-        }
-        meta.dragen_path = file(row.dragen_path)
-    }
-
-    if (row.read1) {
-        if (!file(row.read1).exists()) {
-        exit 1, "ERROR: Please check input samplesheet -> Read 1 file does not exist!\n${row.read1}"
-        }
-        meta.read1 = file(row.read1)
-    }
-    if (row.read2) {
-        if (!file(row.read2).exists()) {
-        exit 1, "ERROR: Please check input samplesheet -> Read 2 file does not exist!\n${row.read2}"
-        }
-        meta.read2 = file(row.read2)
-    }
-
-    if (row.cram) {
-        if (!file(row.cram).exists()) {
-        exit 1, "ERROR: Please check input samplesheet -> Cram file does not exist!\n${row.cram}"
-        }
-        meta.cram = file(row.cram)
-    }
-
-    if (row.bam) {
-        if (!file(row.bam).exists()) {
-        exit 1, "ERROR: Please check input samplesheet -> Bam file does not exist!\n${row.bam}"
-        }
-        meta.bam = file(row.bam)
-    }
-    return meta
 }

@@ -153,12 +153,12 @@ def main():
 
         # Process 'bam'
         if 'bam' in df.columns and df['bam'].notna().any():
-            df_bam = df[df['bam'].notna()].copy().drop(columns=['read1','read2','fastq_list','cram'],errors='ignore')
+            df_bam = df[df['bam'].notna()].copy().drop(columns=['read1','read2','fastq_list','cram'],errors='ignore').rename(columns={'bam':'cram'})
 
     df = pd.concat([df_reads,df_cram,df_bam],axis=0,ignore_index=True)
 
     # Check file existence for 'cram' and 'bam'
-    for col in ['cram', 'bam', 'read1', 'read2']:
+    for col in ['cram', 'read1', 'read2']:
         if col in df.columns:
             if df[col].notna().any() and not df[df[col].notna()][col].apply(os.path.exists).all():
                 raise FileNotFoundError(f"Some files in the '{col}' column do not exist.")

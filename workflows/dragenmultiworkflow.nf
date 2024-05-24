@@ -35,14 +35,15 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 //
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
 //
-include { INPUT_CHECK          } from '../subworkflows/local/input_check.nf'
-include { SOMATIC_INPUT_CHECK  } from '../subworkflows/local/somatic_input_check.nf'
-include { SOMATIC              } from '../subworkflows/local/somatic.nf'
-include { TUMOR                } from '../subworkflows/local/tumor.nf'
-include { ALIGN                } from '../subworkflows/local/align.nf'
+include { SAMPLESHEET_CHECK         } from '../modules/local/samplesheet_check.nf'
+include { GATHER_FASTQS             } from '../subworkflows/local/gather_fastqs.nf'
+include { CONCATENATE_FASTQLISTS    } from '../modules/local/concatenate_fastqlists.nf'
+include { SOMATIC                   } from '../subworkflows/local/somatic.nf'
+include { TUMOR                     } from '../subworkflows/local/tumor.nf'
+include { ALIGN                     } from '../subworkflows/local/align.nf'
+include { RNASEQ                    } from '../subworkflows/local/rna_seq.nf'
+include { METHYLATION               } from '../subworkflows/local/methylation.nf'
 //include { GERMLINE             } from '../subworkflows/local/germline.nf'
-include { RNASEQ               } from '../subworkflows/local/rna_seq.nf'
-include { METHYLATION          } from '../subworkflows/local/methylation.nf'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -87,6 +88,70 @@ def stageFileset(Map filePathMap) {
     return [basePathMap, filePathsList]
 }
 
+def create_samplesheet(LinkedHashMap row) {
+    // create meta map
+    def meta = [:]
+
+    meta.id             = row.id ?: null
+    meta.assay          = row.assay ?: null
+    meta.uid            = row.uid ?: null  
+    meta.sample_type    = row.sample_type ?: null
+    meta.sample_id      = row.sample_id ?: null
+    meta.sex            = row.sex ?: null
+
+    def obj = [:]
+
+    obj.indexes = row.lane && row.i7index && row.i5index ? [ lane:row.lane, i7index:row.i7index, i5index:row.i5index ] : null
+    obj.fastq_list = row.fastq_list ? row.fastq_list : null
+    obj.demux_path = row.demux_path ? row.demux_path : null
+    obj.reads = row.read1 && row.read2 ? [ read1:row.read1, read2:row.read2 ] : null
+    obj.cram = row.cram ? row.cram : null
+    obj.dragen_path = row.dragen_path ? row.dragen_path : null
+
+    return [ meta, obj ] //indexes, fastq_list, demux_path, reads, cram, dragen_path ]
+}
+
+// Function to merge multiple LinkedHashMaps into lists by key using the '<<' operator
+LinkedHashMap merge_maps(List<LinkedHashMap> maps) {
+    LinkedHashMap result = new LinkedHashMap()
+    def count = 0
+    maps.each { map ->
+        map.each { key, value ->
+            if (value != null){        
+                if (result.containsKey(key) && result[key] != null) {
+                    result[key] << value
+                } else {
+                    result[key] = [value]
+                    count++
+                }
+            }
+        }
+    }
+    result['count'] = count
+    return result
+}
+
+def parseCSV(filePath) {
+    List<Map<String, String>> data = []
+
+    // Read the file and split each line
+    filePath.withReader { reader ->
+        // Read the header line to use as keys for the map
+        def headers = reader.readLine().split(',')
+
+        // Process each subsequent line
+        reader.splitEachLine(',') { values ->
+            def row = [:]
+            headers.eachWithIndex { header, i ->
+                row[header.trim()] = values[i].trim()
+            }
+            data.add(row)
+        }
+    }
+
+    return data
+}
+
 // If MGI samplesheet is used, we need to set the 
 // data path because only files are given. This sets the 
 // data path to the samplesheet directory, or the data_path parameter.
@@ -104,13 +169,113 @@ def multiqc_report = []
 workflow DRAGENMULTIWORKFLOW {
 
     ch_versions     = Channel.empty()
+    ch_mastersheet  = Channel.empty()
     ch_input_data   = Channel.empty()
+
+    // Parse mastersheet and get meta hash and inputs.
+    SAMPLESHEET_CHECK(Channel.fromPath(params.mastersheet), data_path)
+    ch_versions = ch_versions.mix(SAMPLESHEET_CHECK.out.versions)
+
+    SAMPLESHEET_CHECK.out.csv
+    .splitCsv ( header:true, sep:',', quote:'"' )
+    .map { create_samplesheet(it) }
+    .groupTuple()
+    .map { meta, inputs -> 
+        def new_inputs = merge_maps(inputs)
+        meta.count = new_inputs.count
+        [ meta, new_inputs ] 
+    }
+    .branch {
+        crams: it[0].count == 1 && it[1].cram != null && params.workflow != 'somatic'
+        fastqs: it[1].cram == null || params.workflow == 'somatic'
+        other: true
+    }.set { ch_mastersheet }
+
+    // get crams. first branch on whether there are multiple crams or a single one.
+    // for now do not handle multiple crams.
+    ch_mastersheet.crams
+    .branch { 
+        single: it[1].cram.size() == 1
+        multiple: it[1].cram.size() > 1
+    }.set { ch_aligned_crams }    
+
+    ch_aligned_crams.single
+    .map { meta, inputs -> 
+        def new_meta = meta.subMap('id', 'uid','sex','sample_type','sample_id','assay')
+        if (inputs.cram[0].split('\\.')[-1] == 'cram') {
+            new_meta.cram = file(inputs.cram[0]).getName()
+            return [ new_meta, 'cram', [ file(inputs.cram[0]), file(inputs.cram[0] + '.crai', checkIfExists: true)  ] ]
+        } else if (inputs.cram[0].split('\\.')[-1] == 'bam') {
+            new_meta.bam = file(inputs.cram[0]).getName()
+            return [ new_meta, 'bam', [ file(inputs.cram[0]), file(inputs.cram[0] + '.bai', checkIfExists: true)  ] ]
+        }
+    }
+    .mix(ch_input_data)
+    .set { ch_input_data }
+    
+    //
+    // get fastqs
+    //
+    GATHER_FASTQS(ch_mastersheet.fastqs)
+    ch_versions = ch_versions.mix(GATHER_FASTQS.out.versions)
+
+    GATHER_FASTQS.out.fastqs
+    .map { meta, fqlist -> 
+        def key = groupKey(meta, meta.count)
+        [ key, fqlist ]
+    }
+    .groupTuple() | CONCATENATE_FASTQLISTS // this is done with a process because otherwise it could wait for the group to fill
+   
+    // this takes the fastq lists and adds the read1/read2 files
+    CONCATENATE_FASTQLISTS.out.fastqlist
+    .map { meta, fastqlist ->
+        def files = [ file(fastqlist) ]
+        def listdata = parseCSV(file(fastqlist))
+        listdata.each { row ->
+            if (row.containsKey('Read1File')) {
+                files.add(file(row['Read1File']))
+            }
+            if (row.containsKey('Read2File')) {
+                files.add(file(row['Read2File']))
+            }
+        }
+        [ meta, 'fastq', files ]
+    }
+    .mix(ch_input_data)
+    .set { ch_input_data }
 
     if (params.workflow == 'somatic') {
 
-        SOMATIC_INPUT_CHECK(Channel.fromPath(mastersheet), data_path)
-        ch_input_data = ch_input_data.mix(SOMATIC_INPUT_CHECK.out.input_data)
+        // for somatic workflow, need to assemble tumor and normal data
+        // note that for the somatic workflow, the input type is only fastq
+        ch_somatic_input = Channel.empty()
 
+        ch_input_data
+        .map { meta, type, files -> 
+            def new_meta = [:]
+            new_meta['id'] = meta.uid
+            new_meta['assay'] = meta.assay
+            def tumor_id = ""
+            def normal_id = ""
+            if (meta.sample_type == 'tumor'){
+                tumor_id = meta.id
+            } else if (meta.sample_type == 'normal'){
+                normal_id = meta.id
+            }
+            [ new_meta, tumor_id, normal_id, files ]
+        }
+        .groupTuple(by:0)
+        .filter { it[1].findAll { it != '' }.unique().size() == 1 && it[2].findAll { it != '' }.unique().size() == 1 }
+        .map { meta, tumor, normal, files -> 
+                new_meta = meta.subMap('id', 'assay')
+                new_meta['tumor'] = tumor.findAll { it != '' }.unique()[0]
+                new_meta['normal'] = normal.findAll { it != '' }.unique()[0]
+
+                return [ new_meta, files.flatten() ]
+        }
+        .filter { it[0].tumor != "" && it[0].normal != "" }
+        .set { ch_somatic_input }
+            
         params.dragen_inputs.methylation_reference = null
         if (params.target_bed_file != null){
             params.dragen_inputs.target_bed_file = params.target_bed_file
@@ -122,14 +287,10 @@ workflow DRAGENMULTIWORKFLOW {
 
         ch_dragen_inputs = Channel.value(stageFileset(params.dragen_inputs))
 
-        SOMATIC(ch_input_data, ch_dragen_inputs)
+        SOMATIC(ch_somatic_input, ch_dragen_inputs)
         ch_versions = ch_versions.mix(SOMATIC.out.versions)
     
     } else {
-
-        INPUT_CHECK(Channel.fromPath(mastersheet), data_path)
-        ch_input_data = ch_input_data.mix(INPUT_CHECK.out.input_data)
-        ch_versions = ch_versions.mix(INPUT_CHECK.out.versions)        
 
         if (params.workflow == '5mc') {
 
@@ -165,6 +326,7 @@ workflow DRAGENMULTIWORKFLOW {
             }
 
             if (params.workflow == 'tumor') {
+                ch_input_data.view()
                 TUMOR(ch_input_data, ch_dragen_inputs)
                 ch_versions = ch_versions.mix(TUMOR.out.versions)
             }
