@@ -16,7 +16,7 @@ process DRAGEN_MULTIALIGN {
     script:
     def input = ""
     if (type == 'fastq') {
-        if (params.workflow == "rna" || params.workflow == "tumor"){
+        if (params.workflow == "rna" || params.workflow == "tumor" || params.workflow == "idtumis"){
             input = "--tumor-fastq-list ${meta.id}.fastq_list.csv --tumor-fastq-list-sample-id ${meta.id}"
         } else if (params.workflow == "5mc" || params.workflow == "germline" || params.workflow == "align") {
             input = "--fastq-list ${meta.id}.fastq_list.csv --fastq-list-sample-id ${meta.id}"
@@ -47,38 +47,43 @@ process DRAGEN_MULTIALIGN {
     def intermediate_dir = task.ext.intermediate_dir ? "--intermediate-results-dir ${task.ext.intermediate_dir}" : ""
     def args_license = task.ext.dragen_license_args ?: ''
     def specified_sex = meta.sex != null ? "--sample-sex ${meta.sex}" : ""
+    def tandup_bed = dragen_inputs.tandem_dup_hotspot_bed != null ? "--sv-somatic-ins-tandup-hotspot-regions-bed inputs/${dragen_inputs.tandem_dup_hotspot_bed}" : ""
+    def hotspotvcf = dragen_inputs.hotspot_vcf != null ? "--vc-somatic-hotspots inputs/${dragen_inputs.hotspot_vcf}" : ""
 
     def dragen_mode_args = ""
 
-    if (params.workflow == "rna"){
-        def downsampleargs = params.downsample_rna ? " --enable-down-sampler true --down-sampler-reads 100000000" : ""
-        dragen_mode_args = "--enable-variant-caller true --enable-rna true -a inputs/${dragen_inputs.annotation_file} --rrna-filter-enable true --enable-rna-quantification true --enable-rna-gene-fusion true ${downsampleargs}"
-    
-    } else if (params.workflow == "5mc"){
-        dragen_mode_args = "--enable-methylation-calling true --methylation-protocol directional --methylation-generate-cytosine-report true --methylation-compress-cx-report true"
+    if (params.workflow == "idtumis" && dragen_inputs.target_bed_file){
+        dragen_mode_args = "--umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --umi-library-type random-simplex --umi-metrics-interval-file inputs/${dragen_inputs.target_bed_file} --enable-variant-caller true --vc-enable-umi-liquid true --dbsnp inputs/${dragen_inputs.dbsnp} ${hotspotvcf} --vc-systematic-noise inputs/${dragen_inputs.snv_noisefile} --vc-target-bed inputs/${dragen_inputs.target_bed_file} --vc-enable-triallelic-filter false --vc-combine-phased-variants-distance 3 --enable-sv true --sv-output-contigs true --sv-hyper-sensitivity true --sv-min-edge-observations 2 --sv-min-candidate-spanning-count 1 --sv-use-overlap-pair-evidence true --sv-systematic-noise inputs/${dragen_inputs.sv_noisefile} --sv-enable-somatic-ins-tandup-hotspot-regions true ${tandup_bed} --sv-exome true --sv-call-regions-bed inputs/${dragen_inputs.target_bed_file}"
+
+    } else {
+        dragen_mode_args = "--enable-duplicate-marking ${params.mark_duplicates} --read-trimmers adapter --trim-adapter-read1 inputs/${dragen_inputs.dragen_adapter1} --trim-adapter-read2 inputs/${dragen_inputs.dragen_adapter2}"
+
+        if (params.workflow == "rna"){
+            def downsampleargs = params.downsample_rna ? " --enable-down-sampler true --down-sampler-reads 100000000" : ""
+            dragen_mode_args += " --enable-variant-caller true --enable-rna true -a inputs/${dragen_inputs.annotation_file} --rrna-filter-enable true --enable-rna-quantification true --enable-rna-gene-fusion true ${downsampleargs}"
         
-    } else if (params.workflow == "tumor" || params.workflow == "somatic"){
-        def tandup_bed = dragen_inputs.tandem_dup_hotspot_bed != null ? "--sv-somatic-ins-tandup-hotspot-regions-bed inputs/${dragen_inputs.tandem_dup_hotspot_bed}" : ""
-        def dux4caller = params.dux4caller == true ? " --enable-dux4-caller true" : ""
-        def hotspotvcf = dragen_inputs.hotspot_vcf != null ? "--vc-somatic-hotspots inputs/${dragen_inputs.hotspot_vcf}" : ""
-        dragen_mode_args = "--enable-variant-caller true --dbsnp inputs/${dragen_inputs.dbsnp} ${hotspotvcf} --vc-systematic-noise inputs/${dragen_inputs.snv_noisefile} --vc-enable-triallelic-filter false --vc-combine-phased-variants-distance 3 --enable-sv true --sv-output-contigs true --sv-hyper-sensitivity true --sv-min-edge-observations 2 --sv-min-candidate-spanning-count 1 --sv-use-overlap-pair-evidence true --sv-systematic-noise inputs/${dragen_inputs.sv_noisefile} --sv-enable-somatic-ins-tandup-hotspot-regions true ${tandup_bed}"
-        if (params.targeted_sequencing == true || params.target_bed_file){
-            dragen_mode_args += " --sv-exome true --sv-call-regions-bed inputs/${dragen_inputs.target_bed_file} --vc-target-bed inputs/${dragen_inputs.target_bed_file}"
-        } else {
-            dragen_mode_args += " --enable-cnv true --cnv-somatic-enable-het-calling true --cnv-enable-ref-calls false --cnv-population-b-allele-vcf inputs/${dragen_inputs.pop_af_vcf}${dux4caller}"
+        } else if (params.workflow == "5mc"){
+            dragen_mode_args += " --enable-methylation-calling true --methylation-protocol directional --methylation-generate-cytosine-report true --methylation-compress-cx-report true"
+            
+        } else if (params.workflow == "tumor" || params.workflow == "somatic"){
+            dragen_mode_args += "--enable-variant-caller true --dbsnp inputs/${dragen_inputs.dbsnp} ${hotspotvcf} --vc-systematic-noise inputs/${dragen_inputs.snv_noisefile} --vc-enable-triallelic-filter false --vc-combine-phased-variants-distance 3 --enable-sv true --sv-output-contigs true --sv-hyper-sensitivity true --sv-min-edge-observations 2 --sv-min-candidate-spanning-count 1 --sv-use-overlap-pair-evidence true --sv-systematic-noise inputs/${dragen_inputs.sv_noisefile} --sv-enable-somatic-ins-tandup-hotspot-regions true ${tandup_bed}"
+            if (params.target_bed_file){
+                dragen_mode_args += " --sv-exome true --sv-call-regions-bed inputs/${dragen_inputs.target_bed_file} --vc-target-bed inputs/${dragen_inputs.target_bed_file}"
+            } else {
+                dragen_mode_args += " --enable-cnv true --cnv-somatic-enable-het-calling true --cnv-enable-ref-calls false --cnv-population-b-allele-vcf inputs/${dragen_inputs.pop_af_vcf}${dux4caller}"
+            }
+
+        } else if (params.workflow == "germline"){
+            dragen_mode_args = "--enable-variant-caller true --dbsnp inputs/${dragen_inputs.dbsnp} --enable-sv true --sv-output-contigs true --sv-use-overlap-pair-evidence true"
+            if (params.target_bed_file){
+                dragen_mode_args += "--sv-exome true --sv-call-regions-bed inputs/${dragen_inputs.target_bed_file} --vc-target-bed inputs/${dragen_inputs.target_bed_file}"
+            } else {
+                dragen_mode_args += "--enable-cnv true --cnv-enable-self-normalization true --enable-cyp2b6 true --enable-cyp2d6 true --enable-gba true --enable-smn true --repeat-genotype-enable true"
+            }
+
+        } else if (params.workflow == "align"){
+            dragen_mode_args += "--enable-variant-caller false --enable-sv false"
         }
-        if (params.umis == true){
-            dragen_mode_args += " --umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --umi-library-type random-simplex --umi-metrics-interval-file ${dragen_inputs.target_bed_file}"
-        }
-    } else if (params.workflow == "germline"){
-        dragen_mode_args = "--enable-variant-caller true --dbsnp inputs/${dragen_inputs.dbsnp} --enable-sv true --sv-output-contigs true --sv-use-overlap-pair-evidence true"
-        if (params.targeted_sequencing == true || params.target_bed_file){
-            dragen_mode_args += "--sv-exome true --sv-call-regions-bed inputs/${dragen_inputs.target_bed_file} --vc-target-bed inputs/${dragen_inputs.target_bed_file}"
-        } else {
-            dragen_mode_args += "--enable-cnv true --cnv-enable-self-normalization true --enable-cyp2b6 true --enable-cyp2d6 true --enable-gba true --enable-smn true --repeat-genotype-enable true"
-        }
-    } else if (params.workflow == "align"){
-        dragen_mode_args = "--enable-variant-caller false --enable-sv false"
     }
 
     """
@@ -88,12 +93,8 @@ process DRAGEN_MULTIALIGN {
                 --enable-sort true \\
                 --enable-bam-indexing true \\
                 --enable-map-align-output true \\
-                --qc-coverage-ignore-overlaps=true \\
+                --qc-coverage-ignore-overlaps true \\
                 --gc-metrics-enable true \\
-                --enable-duplicate-marking ${params.mark_duplicates} \\
-                --read-trimmers adapter \\
-                --trim-adapter-read1 inputs/${dragen_inputs.dragen_adapter1} \\
-                --trim-adapter-read2 inputs/${dragen_inputs.dragen_adapter2} \\
                 --output-format ${params.alignment_file_format} \\
                 --output-directory ./dragen --force --output-file-prefix ${meta.id} ${dragen_mode_args}
 
@@ -158,9 +159,6 @@ process DRAGEN_MULTIALIGN {
         } else {
             dragen_mode_args += " --enable-cnv true --cnv-somatic-enable-het-calling true --cnv-enable-ref-calls false --cnv-population-b-allele-vcf inputs/${dragen_inputs.pop_af_vcf}${dux4caller}"
         }
-        if (params.umis == true){
-            dragen_mode_args += " --umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --umi-library-type random-simplex --umi-metrics-interval-file ${dragen_inputs.target_bed_file}"
-        }
     } else if (params.workflow == "germline"){
         dragen_mode_args = "--enable-variant-caller true --dbsnp inputs/${dragen_inputs.dbsnp} --enable-sv true --sv-output-contigs true --sv-use-overlap-pair-evidence true"
         if (params.targeted_sequencing == true || params.target_bed_file){
@@ -170,6 +168,9 @@ process DRAGEN_MULTIALIGN {
         }
     } else if (params.workflow == "align"){
         dragen_mode_args = "--enable-variant-caller false --enable-sv false"
+    }
+    if (params.umis == true){
+        dragen_mode_args += " --umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --umi-library-type random-simplex --umi-metrics-interval-file ${dragen_inputs.target_bed_file}"
     }
 
     """

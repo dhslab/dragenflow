@@ -156,9 +156,8 @@ def parseCSV(filePath) {
 // data path because only files are given. This sets the 
 // data path to the samplesheet directory, or the data_path parameter.
 def data_path = ""
-def mastersheet = params.mastersheet
 if (params.mgi == true) {
-    data_path = new File(params.mastersheet).parentFile.absolutePath
+    data_path = new File(params.input).parentFile.absolutePath
 } else if (params.data_path != null){
     data_path  = params.data_path
 }
@@ -173,7 +172,7 @@ workflow DRAGENFLOW {
     ch_input_data   = Channel.empty()
 
     // Parse mastersheet and get meta hash and inputs.
-    SAMPLESHEET_CHECK(Channel.fromPath(params.mastersheet), data_path)
+    SAMPLESHEET_CHECK(Channel.fromPath(params.input), data_path)
     ch_versions = ch_versions.mix(SAMPLESHEET_CHECK.out.versions)
 
     SAMPLESHEET_CHECK.out.csv
@@ -213,6 +212,8 @@ workflow DRAGENFLOW {
     .mix(ch_input_data)
     .set { ch_input_data }
     
+    ch_mastersheet.fastqs.dump(pretty: true)
+
     //
     // get fastqs
     //
@@ -243,6 +244,8 @@ workflow DRAGENFLOW {
     }
     .mix(ch_input_data)
     .set { ch_input_data }
+
+    ch_input_data.dump(pretty: true)
 
     if (params.workflow == 'somatic') {
 
@@ -331,7 +334,7 @@ workflow DRAGENFLOW {
                 ch_versions = ch_versions.mix(TUMOR.out.versions)
             }
 
-            if (params.workflow == 'align') {
+            if (params.workflow == 'align' || (params.workflow == 'idtumis' && params.target_bed_file != null)) {
                 ALIGN(ch_input_data, ch_dragen_inputs)
                 ch_versions = ch_versions.mix(ALIGN.out.versions)
             }

@@ -1,3 +1,2 @@
-id,bam,cram
-10929-BM-lib1,REPLACEPATH/crams/10929-BM-lib1_input.bam,
-10940-BM-lib1,,REPLACEPATH/crams/10940-BM-lib1_input.cram
+id,cram
+10929-BM-lib1,REPLACEPATH/crams/10940-BM-lib1_input.cram
