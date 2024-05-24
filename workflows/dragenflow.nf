@@ -13,7 +13,7 @@ def summary_params = paramsSummaryMap(workflow)
 // Print parameter summary log to screen
 log.info logo + paramsSummaryLog(workflow) + citation
 
-WorkflowDragenmultiworkflow.initialise(params, log)
+WorkflowDragenflow.initialise(params, log)
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -166,7 +166,7 @@ if (params.mgi == true) {
 // Info required for completion email and summary
 def multiqc_report = []
 
-workflow DRAGENMULTIWORKFLOW {
+workflow DRAGENFLOW {
 
     ch_versions     = Channel.empty()
     ch_mastersheet  = Channel.empty()
@@ -346,10 +346,10 @@ workflow DRAGENMULTIWORKFLOW {
     //
     // MODULE: MultiQC
     //
-    workflow_summary    = WorkflowDragenmultiworkflow.paramsSummaryMultiqc(workflow, summary_params)
+    workflow_summary    = WorkflowDragenflow.paramsSummaryMultiqc(workflow, summary_params)
     ch_workflow_summary = Channel.value(workflow_summary)
 
-    methods_description    = WorkflowDragenmultiworkflow.methodsDescriptionText(workflow, ch_multiqc_custom_methods_description, params)
+    methods_description    = WorkflowDragenflow.methodsDescriptionText(workflow, ch_multiqc_custom_methods_description, params)
     ch_methods_description = Channel.value(methods_description)
 
     ch_multiqc_files = Channel.empty()

@@ -1,7 +1,7 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema",
-    "$id": "https://raw.githubusercontent.com/nf-core/dragenmultiworkflow/master/nextflow_schema.json",
-    "title": "nf-core/dragenmultiworkflow pipeline parameters",
+    "$id": "https://raw.githubusercontent.com/nf-core/dragenflow/master/nextflow_schema.json",
+    "title": "nf-core/dragenflow pipeline parameters",
     "description": "Run multple dragen workflows (5mc,rna,tumor_normal)",
     "type": "object",
     "definitions": {

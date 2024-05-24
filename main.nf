@@ -1,11 +1,11 @@
 #!/usr/bin/env nextflow
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    nf-core/dragenmultiworkflow
+    nf-core/dragenflow
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Github : https://github.com/nf-core/dragenmultiworkflow
-    Website: https://nf-co.re/dragenmultiworkflow
-    Slack  : https://nfcore.slack.com/channels/dragenmultiworkflow
+    Github : https://github.com/nf-core/dragenflow
+    Website: https://nf-co.re/dragenflow
+    Slack  : https://nfcore.slack.com/channels/dragenflow
 ----------------------------------------------------------------------------------------
 */
 
@@ -47,13 +47,13 @@ WorkflowMain.initialise(workflow, params, log)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { DRAGENMULTIWORKFLOW } from './workflows/dragenmultiworkflow.nf'
+include { DRAGENFLOW } from './workflows/dragenflow.nf'
 
 //
-// WORKFLOW: Run main nf-core/dragenmultiworkflow analysis pipeline
+// WORKFLOW: Run main nf-core/dragenflow analysis pipeline
 //
-workflow NFCORE_DRAGENMULTIWORKFLOW {
-    DRAGENMULTIWORKFLOW ()
+workflow NFCORE_DRAGENFLOW {
+    DRAGENFLOW ()
 }
 
 /*
@@ -67,7 +67,7 @@ workflow NFCORE_DRAGENMULTIWORKFLOW {
 // See: https://github.com/nf-core/rnaseq/issues/619
 //
 workflow {
-    NFCORE_DRAGENMULTIWORKFLOW ()
+    NFCORE_DRAGENFLOW ()
 }
 
 /*
