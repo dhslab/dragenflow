@@ -48,6 +48,7 @@ process DRAGEN_MULTIALIGN {
     def args_license = task.ext.dragen_license_args ?: ''
     def specified_sex = meta.sex != null ? "--sample-sex ${meta.sex}" : ""
     def tandup_bed = dragen_inputs.tandem_dup_hotspot_bed != null ? "--sv-somatic-ins-tandup-hotspot-regions-bed inputs/${dragen_inputs.tandem_dup_hotspot_bed}" : ""
+    def dux4caller = params.dux4caller == true ? " --enable-dux4-caller true" : ""
     def hotspotvcf = dragen_inputs.hotspot_vcf != null ? "--vc-somatic-hotspots inputs/${dragen_inputs.hotspot_vcf}" : ""
 
     def dragen_mode_args = ""
@@ -151,8 +152,6 @@ process DRAGEN_MULTIALIGN {
         
     } else if (params.workflow == "tumor" || params.workflow == "somatic"){
         def tandup_bed = dragen_inputs.tandem_dup_hotspot_bed != null ? "--sv-somatic-ins-tandup-hotspot-regions-bed inputs/${dragen_inputs.tandem_dup_hotspot_bed}" : ""
-        def dux4caller = params.dux4caller == true ? " --enable-dux4-caller true" : ""
-        def hotspotvcf = dragen_inputs.hotspot_vcf != null ? "--vc-somatic-hotspots inputs/${dragen_inputs.hotspot_vcf}" : ""
         dragen_mode_args = "--enable-variant-caller true --dbsnp inputs/${dragen_inputs.dbsnp} ${hotspotvcf} --vc-systematic-noise inputs/${dragen_inputs.snv_noisefile} --vc-enable-triallelic-filter false --vc-combine-phased-variants-distance 3 --enable-sv true --sv-output-contigs true --sv-hyper-sensitivity true --sv-min-edge-observations 2 --sv-min-candidate-spanning-count 1 --sv-use-overlap-pair-evidence true --sv-systematic-noise inputs/${dragen_inputs.sv_noisefile} --sv-enable-somatic-ins-tandup-hotspot-regions true ${tandup_bed}"
         if (params.targeted_sequencing == true || params.target_bed_file){
             dragen_mode_args += " --sv-exome true --sv-call-regions-bed inputs/${dragen_inputs.target_bed_file} --vc-target-bed inputs/${dragen_inputs.target_bed_file}"
