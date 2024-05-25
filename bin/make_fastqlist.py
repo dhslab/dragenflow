@@ -17,7 +17,7 @@ RGID,RGSM,RGLB,Lane,Read1File,Read2File
 
 -Returns a fastq_list.csv file in this format:
 
-RGID,RGSM,RGLB,Lane,RGPU,Read1File,Read2File
+RGID,RGSM,RGLB,Lane,RGPL,Read1File,Read2File
 
 -Generates tags with this format:
 
@@ -25,11 +25,11 @@ RGID: <flowcell>.<i7index>.<i5index>.<lane>
 RGSM: <sample id> (passed as argument)
 RGLB: <sample id>.<i7index>.<i5index>
 Lane: <lane number>
-RGPU: <runid>.<instrument><side>.<flowcell>.<flowcelltype>.<flowcell_lot>.<reagent_lot>.<runrecipe>
+RGL: <runid>.<instrument><side>.<flowcell>.<flowcelltype>.<flowcell_lot>.<reagent_lot>.<runrecipe>
 Read1File: <read1 file path>
 Read2File: <read2 file path>
 
--Obtains RGPU info from either a RunParameters.xml file or the reads (info from reads is incomplete)
+-Obtains RGPL info from either a RunParameters.xml file or the reads (info from reads is incomplete)
 -If demux path is given, look for Reports/fastq_list.csv
 
 """
@@ -172,14 +172,15 @@ def main():
             print(f"Read 1 and 2 do not match\n\t{read1}\n\t{read2}")
             sys.exit(1)
 
-        fastqlist_outfile = f'{id}.fastq_list.csv'
-        with open(fastqlist_outfile, 'w', newline='') as cfile:
-            writer = csv.writer(cfile)
-            writer.writerow(['RGID','RGSM','RGLB','Lane','RGPU','Read1File','Read2File'])
-            rgid = '.'.join([runinfo['Flowcell'],runinfo['Index1'],runinfo['Index2'],runinfo['Lane']])
-            rglb = '.'.join([id,runinfo['Index1'],runinfo['Index2']])
-            rgpu = f"{runinfo['RunId']}.{runinfo['Instrument']}.{runinfo['Flowcell']}.{runinfo['FlowcellType']}.{runinfo['FlowcellLot']}.{runinfo['ReagentLot']}.{runinfo['Read1Cycles']}x{runinfo['Index1Cycles']}x{runinfo['Index2Cycles']}x{runinfo['Read2Cycles']}"
-            writer.writerow([rgid,id,rglb,runinfo['Lane'],rgpu,read1,read2])
+        fqlistout = pd.DataFrame(columns=['RGID','RGSM','RGLB','Lane','RGPL','Read1File','Read2File'])
+
+        rgid = '.'.join([runinfo['Flowcell'],runinfo['Index1'],runinfo['Index2'],runinfo['Lane']])
+        rglb = '.'.join([id,runinfo['Index1'],runinfo['Index2']])
+        rgpl = f"{runinfo['RunId']}.{runinfo['Instrument']}.{runinfo['Flowcell']}.{runinfo['FlowcellType']}.{runinfo['FlowcellLot']}.{runinfo['ReagentLot']}.{runinfo['Read1Cycles']}x{runinfo['Index1Cycles']}x{runinfo['Index2Cycles']}x{runinfo['Read2Cycles']}"
+
+        fqlistout.loc[len(fqlistout)] = [rgid,id,rglb,runinfo['Lane'],rgpl,read1,read2]
+
+        fqlistout.to_csv(f'{id}.fastq_list.csv',index=False)
 
     # options 2 and 3, if a fastq list or demux path are supplied
     else:
@@ -209,7 +210,7 @@ def main():
 
         fqlist = fqlist[fqlist['RGSM']==id]
 
-        fqlistout = pd.DataFrame(columns=['RGID','RGSM','RGLB','Lane','RGPU','Read1File','Read2File'])
+        fqlistout = pd.DataFrame(columns=['RGID','RGSM','RGLB','Lane','RGPL','Read1File','Read2File'])
 
         for index, row in fqlist.iterrows():
             read1 = row['Read1File']
@@ -235,9 +236,9 @@ def main():
 
             rgid = f"{runinfo['Flowcell']}.{row['RGID']}"
             rglb = f"{id}.{row['RGID'][:-2]}"
-            rgpu = f"{runinfo['RunId']}.{runinfo['Instrument']}.{runinfo['Flowcell']}.{runinfo['FlowcellType']}.{runinfo['FlowcellLot']}.{runinfo['ReagentLot']}.{runinfo['Read1Cycles']}x{runinfo['Index1Cycles']}x{runinfo['Index2Cycles']}x{runinfo['Read2Cycles']}"
+            rgpl = f"{runinfo['RunId']}.{runinfo['Instrument']}.{runinfo['Flowcell']}.{runinfo['FlowcellType']}.{runinfo['FlowcellLot']}.{runinfo['ReagentLot']}.{runinfo['Read1Cycles']}x{runinfo['Index1Cycles']}x{runinfo['Index2Cycles']}x{runinfo['Read2Cycles']}"
 
-            fqlistout.loc[len(fqlistout)] = [rgid,id,rglb,lane,rgpu,read1,read2]
+            fqlistout.loc[len(fqlistout)] = [rgid,id,rglb,lane,rgpl,read1,read2]
 
         fqlistout.to_csv(f'{id}.fastq_list.csv',index=False)
 
