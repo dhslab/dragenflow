@@ -274,7 +274,7 @@ workflow DRAGENFLOW {
                 new_meta['tumor'] = tumor.findAll { it != '' }.unique()[0]
                 new_meta['normal'] = normal.findAll { it != '' }.unique()[0]
 
-                return [ new_meta, files.flatten() ]
+                return [ new_meta, "fastq", files.flatten() ]
         }
         .filter { it[0].tumor != "" && it[0].normal != "" }
         .set { ch_somatic_input }
