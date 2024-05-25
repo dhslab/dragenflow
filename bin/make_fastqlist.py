@@ -91,7 +91,12 @@ def make_runinfo_from_read(readpath):
             index1, index2 = matches
             index1len = f"{len(index1)}?"
             index2len = f"{len(index2)}?"
-            
+        elif len(matches) == 1:
+            index1 = matches
+            index2 = matches
+        else:
+            index1 = f"{os.path.basename(readpath).split('.')[0]}.{index1}"
+
     # Make run info dict
     runinfo = {'RunId':f"RUN_{parts[0][1:]}_{str(int(parts[1])).zfill(4)}_{parts[2]}",
                 'Flowcell':parts[2],
