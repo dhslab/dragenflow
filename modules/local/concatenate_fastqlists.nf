@@ -6,11 +6,10 @@ process CONCATENATE_FASTQLISTS {
     tuple val(meta), path(fastqlists)
 
     output:
-    tuple val(meta), path("${meta.id}.fastq_list.csv"), emit: fastqlist
+    tuple val(meta), path("${meta.id}.fastq_list.csv"), path("${meta.id}.fastqs.csv"), emit: fastqs
 
     script:
-    """
-    echo "RGID,RGSM,RGLB,Lane,RGPU,Read1File,Read2File" > ${meta.id}.fastq_list.csv
-    cat ${fastqlists.join(' ')} >> ${meta.id}.fastq_list.csv
+    """ 
+    concatenate_fastqlists.py ${meta.id} ${fastqlists.join(' ')}
     """
 }

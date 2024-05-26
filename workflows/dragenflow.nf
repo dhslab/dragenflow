@@ -227,18 +227,14 @@ workflow DRAGENFLOW {
     }
     .groupTuple() | CONCATENATE_FASTQLISTS // this is done with a process because otherwise it could wait for the group to fill
    
-    // this takes the fastq lists and adds the read1/read2 files
-    CONCATENATE_FASTQLISTS.out.fastqlist
-    .map { meta, fastqlist ->
-        def files = [ file(fastqlist) ]
-        def listdata = parseCSV(file(fastqlist))
-        listdata.each { row ->
-            if (row.containsKey('Read1File')) {
-                files.add(file(row['Read1File']))
-            }
-            if (row.containsKey('Read2File')) {
-                files.add(file(row['Read2File']))
-            }
+    // this takes the fastq_list files and the fastq fof and 
+    // combines them
+    CONCATENATE_FASTQLISTS.out.fastqs
+    .map { meta, fastqlist, fastqs ->
+        def files = [fastqlist]
+        def lines = new File(fastqs.toString()).readLines()
+        lines.each { line ->
+            files.add(file(line))
         }
         [ meta, 'fastq', files ]
     }
