@@ -2,7 +2,7 @@ process DRAGEN_MULTIALIGN {
     tag "${meta.id}"
     label 'dragen'
     label 'dragenalign'
-    container "${ext.dragen_aws_image}" ?: "${params.dragen_container}"
+    container "${params.dragen_container}"
     publishDir "$params.outdir/${meta.id}/", saveAs: { filename -> filename == "versions.yml" ? null : filename.split('/')[1] }, mode:'copy'
 
     input:
@@ -89,7 +89,7 @@ process DRAGEN_MULTIALIGN {
 
     """
     mkdir dragen && \\
-    /opt/edico/bin/dragen -r inputs/${dragen_inputs.reference} ${specified_sex} ${input} ${intermediate_dir} ${args_license}\\
+    ${task.ext.dragen_path}/dragen -r inputs/${dragen_inputs.reference} ${specified_sex} ${input} ${intermediate_dir} ${args_license}\\
                 --enable-map-align true \\
                 --enable-sort true \\
                 --enable-bam-indexing true \\
@@ -174,7 +174,7 @@ process DRAGEN_MULTIALIGN {
 
     """
     mkdir dragen && \\
-    echo /opt/edico/bin/dragen -r inputs/${dragen_inputs.reference} ${input} ${intermediate_dir} ${args_license}\\
+    echo ${task.ext.dragen_path}/dragen -r inputs/${dragen_inputs.reference} ${input} ${intermediate_dir} ${args_license}\\
                 --enable-map-align true \\
                 --enable-sort true \\
                 --enable-bam-indexing true \\

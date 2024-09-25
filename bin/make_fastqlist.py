@@ -51,12 +51,17 @@ def make_runinfo_from_read(readpath):
     
     # if indexes are present in the read header, get the first 100
     # and find the most common one (to account for mismatches/errors in index read)
-    parts = readName.split(':')
+    parts = '?'
+    if ':' in readName:
+        parts = readName.split(':')
+    elif 'SRR' in readName:
+        parts = [ readName.split(' ')[0] ]
+
     index1 = 'UNKNOWN'
     index2 = 'UNKNOWN'
     index1len = '?'
     index2len = '?'
-    indexes = readName.split(' ')
+    readIndexes = readName.split(' ')
     readlen = '?'
     indexlist = []
     seqlist = []
@@ -65,7 +70,8 @@ def make_runinfo_from_read(readpath):
             if i % 4 == 0:  # Read names are on every 4th line starting from 0
                 read_name = line.strip()
                 indexes = read_name.split(' ')
-                if len(indexes) > 1:
+                # check if indexes are present in the read name and contain only ACGT characters
+                if len(indexes) > 1 and re.match('^[ACTG]+$', indexes[1].split(':')[-1]):
                     index = indexes[1].split(':')[-1]
                     indexlist = indexlist + [index]
     
@@ -82,7 +88,8 @@ def make_runinfo_from_read(readpath):
 
     counter = Counter(seqlist)
     readlen, _ = counter.most_common(1)[0]
-
+    readlen = max(seqlist)
+    
     # if indexes are ?, try to recover from the read name
     if index1 == 'UNKNOWN':
         pattern = '[ACTG]{8,}'
@@ -95,13 +102,28 @@ def make_runinfo_from_read(readpath):
             index1 = matches
             index2 = matches
         else:
-            index1 = f"{os.path.basename(readpath).split('.')[0]}.{index1}"
+            index1 = f"{parts[0][1:]}.{index1}"
 
     # Make run info dict
-    runinfo = {'RunId':f"RUN_{parts[0][1:]}_{str(int(parts[1])).zfill(4)}_{parts[2]}",
-                'Flowcell':parts[2],
-                'Lane':parts[3],
-                'Instrument':parts[0][1:],
+    instrument = '?'
+    runid = '?'
+    flowcell = '?'
+    lane = '?'
+    if len(parts) == 1:
+        instrument = parts[0][1:]
+        runid = parts[0][1:]
+        flowcell = parts[0][1:]
+        lane = parts[0][1:]
+    else:
+        instrument = parts[0][1:]
+        runid = f"RUN_{parts[0][1:]}_{str(int(parts[1])).zfill(4)}_{parts[2]}"
+        flowcell = parts[2]
+        lane = parts[3]
+
+    runinfo = {'RunId':runid,
+                'Flowcell':flowcell,
+                'Lane':lane,
+                'Instrument':instrument,
                 'Read1Cycles':f"{readlen}",
                 "Index1Cycles": index1len,
                 "Index1Reverse": "?",
