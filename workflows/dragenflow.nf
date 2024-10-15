@@ -212,7 +212,7 @@ workflow DRAGENFLOW {
     .mix(ch_input_data)
     .set { ch_input_data }
     
-    ch_mastersheet.fastqs.dump(pretty: true)
+    // ch_mastersheet.fastqs.dump(pretty: true)
 
     //
     // get fastqs
@@ -241,7 +241,7 @@ workflow DRAGENFLOW {
     .mix(ch_input_data)
     .set { ch_input_data }
 
-    ch_input_data.dump(pretty: true)
+    // ch_input_data.dump(pretty: true)
 
     if (params.workflow == 'somatic') {
 

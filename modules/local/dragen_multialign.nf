@@ -142,10 +142,12 @@ process DRAGEN_MULTIALIGN {
     def specified_sex = meta.sex != null ? "--sample-sex ${meta.sex}" : ""
 
     def dragen_mode_args = ""
+    def args = ""
 
     if (params.workflow == "rna"){
         def downsampleargs = params.downsample_rna ? " --enable-down-sampler true --down-sampler-reads 100000000" : ""
         dragen_mode_args = "--enable-variant-caller true --enable-rna true -a inputs/${dragen_inputs.annotation_file} --rrna-filter-enable true --enable-rna-quantification true --enable-rna-gene-fusion true ${downsampleargs}"
+        args = "cp ${params.rna_test_dir}/${meta.id}/* dragen/"
     
     } else if (params.workflow == "5mc"){
         dragen_mode_args = "--enable-methylation-calling true --methylation-protocol directional --methylation-generate-cytosine-report true --methylation-compress-cx-report true"
@@ -187,6 +189,7 @@ process DRAGEN_MULTIALIGN {
                 --trim-adapter-read2 inputs/${dragen_inputs.dragen_adapter2} \\
                 --output-format ${params.alignment_file_format} \\
                 --output-directory ./dragen --force --output-file-prefix ${meta.id} ${dragen_mode_args} > ./dragen/${meta.id}.txt
+    $args
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
