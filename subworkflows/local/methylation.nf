@@ -14,7 +14,7 @@ workflow METHYLATION {
     // Need to add a process to convert dragen methylation output to a bed file.
     
     emit: 
-    dragen_outputs = DRAGEN_METHYLATION.out.dragen_outputs
+    dragen_outputs = DRAGEN_METHYLATION.out.dragen_output
     versions = ch_versions
 
 }
