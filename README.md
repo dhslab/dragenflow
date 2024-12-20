@@ -4,6 +4,22 @@
 
 **nf-core/dragenflow** is a bioinformatics pipeline that runs a variety of dragen commands and workflows for downstream analysis
 
+## Pipeline Summary:
+all workflows:
+- samplesheet check
+- make fasqlists (from reads/crams/bams)
+- concatenate fastqlists
+- run dragen
+
+rna downstream analysis:
+- get sizes file and strandedness
+- annotate rnaseq
+- bedtools genomecov
+- ucsc bedclip, bedgraph to bigwig
+
+tumor downstream analysis
+- annotate small variants
+
 <!-- TODO nf-core:
    Complete this sentence with a 2-3 sentence summary of what types of data the pipeline ingests, a brief overview of the
    major pipeline sections and the types of output it produces. You're giving an overview to someone new
@@ -72,48 +88,20 @@ Each row represents a fastq file (single-end) or a pair of fastq files (paired e
 > --dragen_args \<dragen arguments> : provides additional arguments in dragen command
 >
 > --mgi true : pass if mgi samplesheet is used
-
-:::warning
-Please provide pipeline parameters via the CLI or Nextflow `-params-file` option. Custom config files including those
-provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_;
-see [docs](https://nf-co.re/usage/configuration#custom-configuration-files).
-:::
-
-For more details and further functionality, please refer to the [usage documentation](https://nf-co.re/dragenflow/usage) and the [parameter documentation](https://nf-co.re/dragenflow/parameters).
-
-## Pipeline output
-
-To see the results of an example test run with a full size dataset refer to the [results](https://nf-co.re/dragenflow/results) tab on the nf-core website pipeline page.
-For more details about the output files and reports, please refer to the
-[output documentation](https://nf-co.re/dragenflow/output).
-
-## Credits
-
-nf-core/dragenflow was originally written by Nidhi.
-
-We thank the following people for their extensive assistance in the development of this pipeline:
-
-<!-- TODO nf-core: If applicable, make list of people who have also contributed -->
-
-## Contributions and Support
-
-If you would like to contribute to this pipeline, please see the [contributing guidelines](.github/CONTRIBUTING.md).
-
-For further information or help, don't hesitate to get in touch on the [Slack `#dragenflow` channel](https://nfcore.slack.com/channels/dragenflow) (you can join with [this invite](https://nf-co.re/join/slack)).
-
-## Citations
-
-<!-- TODO nf-core: Add citation for pipeline after first release. Uncomment lines below and update Zenodo doi and badge at the top of this file. -->
-<!-- If you use  nf-core/dragenflow for your analysis, please cite it using the following doi: [10.5281/zenodo.XXXXXX](https://doi.org/10.5281/zenodo.XXXXXX) -->
-
-<!-- TODO nf-core: Add bibliography of tools and data used in your pipeline -->
-
-An extensive list of references for the tools used by the pipeline can be found in the [`CITATIONS.md`](CITATIONS.md) file.
-
-You can cite the `nf-core` publication as follows:
-
-> **The nf-core framework for community-curated bioinformatics pipelines.**
 >
-> Philip Ewels, Alexander Peltzer, Sven Fillinger, Harshil Patel, Johannes Alneberg, Andreas Wilm, Maxime Ulysse Garcia, Paolo Di Tommaso & Sven Nahnsen.
+> -bucket-dir \<path to s3 bucket dir> : pass if aws is used
+
+### AWS
+> run the following commands:
 >
-> _Nat Biotechnol._ 2020 Feb 13. doi: [10.1038/s41587-020-0439-x](https://dx.doi.org/10.1038/s41587-020-0439-x).
+> nextflow secrets set AWS_ACCESS_KEY \<aws access key>
+>
+> nextflow secrets set AWS_SECRET_KEY \<aws secret key>
+>
+> export DRAGEN_USERNAME \<dragen username>
+>
+> export DRAGEN_PASSWORD \<dragen password>
+>
+> to check if secrets are set/exist in NXF_HOME, run:
+>
+> nextflow secrets list
