@@ -52,6 +52,7 @@ process DRAGEN_MULTIALIGN {
     def hotspotvcf = dragen_inputs.hotspot_vcf != null ? "--vc-somatic-hotspots inputs/${dragen_inputs.hotspot_vcf}" : ""
 
     def dragen_mode_args = ""
+    def args = params.dragen_args ?: ""
 
     if (params.workflow == "idtumis" && dragen_inputs.target_bed_file){
         dragen_mode_args = "--umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --umi-library-type random-simplex --umi-metrics-interval-file inputs/${dragen_inputs.target_bed_file} --enable-variant-caller true --vc-enable-umi-liquid true --dbsnp inputs/${dragen_inputs.dbsnp} ${hotspotvcf} --vc-systematic-noise inputs/${dragen_inputs.snv_noisefile} --vc-target-bed inputs/${dragen_inputs.target_bed_file} --vc-enable-triallelic-filter false --vc-combine-phased-variants-distance 3 --enable-sv true --sv-output-contigs true --sv-hyper-sensitivity true --sv-min-edge-observations 2 --sv-min-candidate-spanning-count 1 --sv-use-overlap-pair-evidence true --sv-systematic-noise inputs/${dragen_inputs.sv_noisefile} --sv-enable-somatic-ins-tandup-hotspot-regions true ${tandup_bed} --sv-exome true --sv-call-regions-bed inputs/${dragen_inputs.target_bed_file}"
@@ -97,7 +98,7 @@ process DRAGEN_MULTIALIGN {
                 --qc-coverage-ignore-overlaps true \\
                 --gc-metrics-enable true \\
                 --output-format ${params.alignment_file_format} \\
-                --output-directory ./dragen --force --output-file-prefix ${meta.id} ${dragen_mode_args}
+                --output-directory ./dragen --force --output-file-prefix ${meta.id} ${dragen_mode_args} ${args}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -188,8 +189,7 @@ process DRAGEN_MULTIALIGN {
                 --trim-adapter-read1 inputs/${dragen_inputs.dragen_adapter1} \\
                 --trim-adapter-read2 inputs/${dragen_inputs.dragen_adapter2} \\
                 --output-format ${params.alignment_file_format} \\
-                --output-directory ./dragen --force --output-file-prefix ${meta.id} ${dragen_mode_args} > ./dragen/${meta.id}.txt
-    $args
+                --output-directory ./dragen --force --output-file-prefix ${meta.id} ${dragen_mode_args} > ./dragen/${meta.id}.txt $args
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

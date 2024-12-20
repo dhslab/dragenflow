@@ -1,19 +1,8 @@
 # ![nf-core/dragenflow](docs/images/nf-core-dragenflow_logo_light.png#gh-light-mode-only) ![nf-core/dragenflow](docs/images/nf-core-dragenflow_logo_dark.png#gh-dark-mode-only)
 
-[![GitHub Actions CI Status](https://github.com/nf-core/dragenflow/workflows/nf-core%20CI/badge.svg)](https://github.com/nf-core/dragenflow/actions?query=workflow%3A%22nf-core+CI%22)
-[![GitHub Actions Linting Status](https://github.com/nf-core/dragenflow/workflows/nf-core%20linting/badge.svg)](https://github.com/nf-core/dragenflow/actions?query=workflow%3A%22nf-core+linting%22)[![AWS CI](https://img.shields.io/badge/CI%20tests-full%20size-FF9900?labelColor=000000&logo=Amazon%20AWS)](https://nf-co.re/dragenflow/results)[![Cite with Zenodo](http://img.shields.io/badge/DOI-10.5281/zenodo.XXXXXXX-1073c8?labelColor=000000)](https://doi.org/10.5281/zenodo.XXXXXXX)
-
-[![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A523.04.0-23aa62.svg)](https://www.nextflow.io/)
-[![run with conda](http://img.shields.io/badge/run%20with-conda-3EB049?labelColor=000000&logo=anaconda)](https://docs.conda.io/en/latest/)
-[![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
-[![run with singularity](https://img.shields.io/badge/run%20with-singularity-1d355c.svg?labelColor=000000)](https://sylabs.io/docs/)
-[![Launch on Nextflow Tower](https://img.shields.io/badge/Launch%20%F0%9F%9A%80-Nextflow%20Tower-%234256e7)](https://tower.nf/launch?pipeline=https://github.com/nf-core/dragenflow)
-
-[![Get help on Slack](http://img.shields.io/badge/slack-nf--core%20%23dragenflow-4A154B?labelColor=000000&logo=slack)](https://nfcore.slack.com/channels/dragenflow)[![Follow on Twitter](http://img.shields.io/badge/twitter-%40nf__core-1DA1F2?labelColor=000000&logo=twitter)](https://twitter.com/nf_core)[![Follow on Mastodon](https://img.shields.io/badge/mastodon-nf__core-6364ff?labelColor=FFFFFF&logo=mastodon)](https://mstdn.science/@nf_core)[![Watch on YouTube](http://img.shields.io/badge/youtube-nf--core-FF0000?labelColor=000000&logo=youtube)](https://www.youtube.com/c/nf-core)
-
 ## Introduction
 
-**nf-core/dragenflow** is a bioinformatics pipeline that ...
+**nf-core/dragenflow** is a bioinformatics pipeline that runs a variety of dragen commands and workflows for downstream analysis
 
 <!-- TODO nf-core:
    Complete this sentence with a 2-3 sentence summary of what types of data the pipeline ingests, a brief overview of the
@@ -25,16 +14,7 @@
      workflows use the "tube map" design for that. See https://nf-co.re/docs/contributing/design_guidelines#examples for examples.   -->
 <!-- TODO nf-core: Fill in short bullet-pointed list of the default steps in the pipeline -->
 
-1. Read QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
-2. Present QC for raw reads ([`MultiQC`](http://multiqc.info/))
-
 ## Usage
-
-:::note
-If you are new to Nextflow and nf-core, please refer to [this page](https://nf-co.re/docs/usage/installation) on how
-to set-up Nextflow. Make sure to [test your setup](https://nf-co.re/docs/usage/introduction#how-to-run-a-pipeline)
-with `-profile test` before running the workflow on actual data.
-:::
 
 <!-- TODO nf-core: Describe the minimum required steps to execute the pipeline, e.g. how to prepare samplesheets.
      Explain what rows and columns represent. For instance (please edit as appropriate):
@@ -52,23 +32,46 @@ Each row represents a fastq file (single-end) or a pair of fastq files (paired e
 
 -->
 
-mgi samplesheet should be updated version, mastersheet should have the following columns:
-sample_id,read1,read2,fastq_list,cram,bam
-where sample_id is library name 
+### Samplesheet Format
 
-Now, you can run the pipeline using:
+>**If running with mgi samplesheet:**
+>
+>Pass flag --mgi true, and use Samplemap2.csv with the following columns:
+>```csv
+>FASTQ Path - Read 1,FASTQ Path - Read 2,Flowcell ID,Index Sequence,Flowcell Lane,ESP ID,Pool Name,Species,Illumina Sample Type,Library Type,Library Name,Date Complete,Total Reads,Total Bases,Avg >Q Score Read 1,Avg Q Score Read 2,% >Q30 Read 1,% >Q30 Read 2,PhiX Error Rate Read 1,PhiX Error Rate Read 2,% Pass Filter Clusters Read 1,% Pass Filter Clusters Read 2
+>```
+>
+>**If running with custom samplesheet:**
+>
+>First column should be id, remaining columns are data type, or a combination of data types (read1,read2/bam/cram)
+>
+>Examples:
+>```csv
+>id,read1,read2
+>sample1,sample1_R1.fastq.gz,sample1_R1.fastq.gz
+>sample2,sample2_R1.fastq.gz,sample2_R1.fastq.gz
+>```
+>
+>```csv
+>id,bam,cram
+>sample1,,sample1.cram
+>sample2,sample2.bam,
+>```
 
-<!-- TODO nf-core: update the following command to include all required parameters for a minimal example -->
+### Run Command
 
-```bash
-nextflow run nf-core/dragenflow \
-   -profile ris,<dragen2/dragen4> \
-   --mgi_samplesheet /path/to/mgi_samplesheet \
-   --input_dir /path/to/input_dir \ 
-   --master_sheet /path/to/master_sheet \ 
-   --outdir <OUTDIR> \ 
-   --workflow <rna/5mc/germline_wgs/tumor_normal>
-```
+>```bash
+>nextflow run dhslab/dragenflow -r dev \
+   >-profile ris,<dragen2/dragen4/dragenaws> \
+   >--input /path/to/samplesheet \
+   >--outdir <OUTDIR> \ 
+   >--workflow <rna/5mc/align/somatic/tumor/idtumis>
+>```
+
+### Optional Parameters
+> --dragen_args \<dragen arguments> : provides additional arguments in dragen command
+>
+> --mgi true : pass if mgi samplesheet is used
 
 :::warning
 Please provide pipeline parameters via the CLI or Nextflow `-params-file` option. Custom config files including those

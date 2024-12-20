@@ -33,17 +33,14 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 */
 
 //
-// SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
+// SUBWORKFLOWS
 //
-include { SAMPLESHEET_CHECK         } from '../modules/local/samplesheet_check.nf'
+include { ALIGN                     } from '../subworkflows/local/align.nf'
 include { GATHER_FASTQS             } from '../subworkflows/local/gather_fastqs.nf'
-include { CONCATENATE_FASTQLISTS    } from '../modules/local/concatenate_fastqlists.nf'
+include { METHYLATION               } from '../subworkflows/local/methylation.nf'
+include { RNASEQ                    } from '../subworkflows/local/rna_seq.nf'
 include { SOMATIC                   } from '../subworkflows/local/somatic.nf'
 include { TUMOR                     } from '../subworkflows/local/tumor.nf'
-include { ALIGN                     } from '../subworkflows/local/align.nf'
-include { RNASEQ                    } from '../subworkflows/local/rna_seq.nf'
-include { METHYLATION               } from '../subworkflows/local/methylation.nf'
-//include { GERMLINE             } from '../subworkflows/local/germline.nf'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -52,9 +49,10 @@ include { METHYLATION               } from '../subworkflows/local/methylation.nf
 */
 
 //
-// MODULE: Installed directly from nf-core/modules
+// MODULES
 //
-include { FASTQC                      } from '../modules/nf-core/fastqc/main'
+include { SAMPLESHEET_CHECK         } from '../modules/local/samplesheet_check.nf'
+include { CONCATENATE_FASTQLISTS    } from '../modules/local/concatenate_fastqlists.nf'
 include { MULTIQC                     } from '../modules/nf-core/multiqc/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
@@ -317,11 +315,6 @@ workflow DRAGENFLOW {
             if (params.workflow == 'rna') {
                 RNASEQ(ch_input_data, ch_dragen_inputs)
                 ch_versions = ch_versions.mix(RNASEQ.out.versions)
-            }
-
-            if (params.workflow == 'germline') {
-                //GERMLINE(ch_input_data, ch_dragen_inputs)
-                //ch_versions = ch_versions.mix(GERMLINE.out.ch_versions)
             }
 
             if (params.workflow == 'tumor') {
