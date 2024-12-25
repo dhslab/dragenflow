@@ -90,7 +90,7 @@ process DRAGEN_MULTIALIGN {
 
     """
     mkdir dragen && \\
-    ${task.ext.dragen_path}/dragen -r inputs/${dragen_inputs.reference} ${specified_sex} ${input} ${intermediate_dir} ${args_license}\\
+    ${task.ext.dragen_exe_path}/dragen -r inputs/${dragen_inputs.reference} ${specified_sex} ${input} ${intermediate_dir} ${args_license}\\
                 --enable-map-align true \\
                 --enable-sort true \\
                 --enable-bam-indexing true \\
