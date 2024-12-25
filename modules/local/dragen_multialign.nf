@@ -16,7 +16,7 @@ process DRAGEN_MULTIALIGN {
     script:
     def input = ""
     if (type == 'fastq') {
-        if (params.workflow == "rna" || params.workflow == "tumor" || params.workflow == "idtumis"){
+        if (params.workflow == "rna" || params.workflow == "tumor"){
             input = "--tumor-fastq-list ${meta.id}.fastq_list.csv --tumor-fastq-list-sample-id ${meta.id}"
         } else if (params.workflow == "5mc" || params.workflow == "germline" || params.workflow == "align") {
             input = "--fastq-list ${meta.id}.fastq_list.csv --fastq-list-sample-id ${meta.id}"
@@ -54,8 +54,15 @@ process DRAGEN_MULTIALIGN {
     def dragen_mode_args = ""
     def args = params.dragen_args ?: ""
 
-    if (params.workflow == "idtumis" && dragen_inputs.target_bed_file){
-        dragen_mode_args = "--umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --umi-library-type random-simplex --umi-metrics-interval-file inputs/${dragen_inputs.target_bed_file} --enable-variant-caller true --vc-enable-umi-liquid true --dbsnp inputs/${dragen_inputs.dbsnp} ${hotspotvcf} --vc-systematic-noise inputs/${dragen_inputs.snv_noisefile} --vc-target-bed inputs/${dragen_inputs.target_bed_file} --vc-enable-triallelic-filter false --vc-combine-phased-variants-distance 3 --enable-sv true --sv-output-contigs true --sv-hyper-sensitivity true --sv-min-edge-observations 2 --sv-min-candidate-spanning-count 1 --sv-use-overlap-pair-evidence true --sv-systematic-noise inputs/${dragen_inputs.sv_noisefile} --sv-enable-somatic-ins-tandup-hotspot-regions true ${tandup_bed} --sv-exome true --sv-call-regions-bed inputs/${dragen_inputs.target_bed_file}"
+    if (params.udiumi == true && dragen_inputs.target_bed_file){
+        dragen_mode_args = "--umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --umi-library-type random-simplex --umi-metrics-interval-file inputs/${dragen_inputs.target_bed_file}"
+        
+        if (params.solid_tumor){
+            dragen_mode_args += "--vc-enable-umi-solid true"
+        } else {
+            dragen_mode_args += "--vc-enable-umi-liquid true"
+        }
+        // --enable-variant-caller true --vc-enable-umi-liquid true --dbsnp inputs/${dragen_inputs.dbsnp} ${hotspotvcf} --vc-systematic-noise inputs/${dragen_inputs.snv_noisefile} --vc-target-bed inputs/${dragen_inputs.target_bed_file} --vc-enable-triallelic-filter false --vc-combine-phased-variants-distance 3 --enable-sv true --sv-output-contigs true --sv-hyper-sensitivity true --sv-min-edge-observations 2 --sv-min-candidate-spanning-count 1 --sv-use-overlap-pair-evidence true --sv-systematic-noise inputs/${dragen_inputs.sv_noisefile} --sv-enable-somatic-ins-tandup-hotspot-regions true ${tandup_bed} --sv-exome true --sv-call-regions-bed inputs/${dragen_inputs.target_bed_file}"
 
     } else {
         dragen_mode_args = "--enable-duplicate-marking ${params.mark_duplicates} --read-trimmers adapter --trim-adapter-read1 inputs/${dragen_inputs.dragen_adapter1} --trim-adapter-read2 inputs/${dragen_inputs.dragen_adapter2}"
