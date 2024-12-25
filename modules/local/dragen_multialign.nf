@@ -163,7 +163,7 @@ process DRAGEN_MULTIALIGN {
     } else if (params.workflow == "tumor" || params.workflow == "somatic"){
         def tandup_bed = dragen_inputs.tandem_dup_hotspot_bed != null ? "--sv-somatic-ins-tandup-hotspot-regions-bed inputs/${dragen_inputs.tandem_dup_hotspot_bed}" : ""
         dragen_mode_args = "--enable-variant-caller true --dbsnp inputs/${dragen_inputs.dbsnp} ${hotspotvcf} --vc-systematic-noise inputs/${dragen_inputs.snv_noisefile} --vc-enable-triallelic-filter false --vc-combine-phased-variants-distance 3 --enable-sv true --sv-output-contigs true --sv-hyper-sensitivity true --sv-min-edge-observations 2 --sv-min-candidate-spanning-count 1 --sv-use-overlap-pair-evidence true --sv-systematic-noise inputs/${dragen_inputs.sv_noisefile} --sv-enable-somatic-ins-tandup-hotspot-regions true ${tandup_bed}"
-        if (params.targeted_sequencing == true || params.target_bed_file){
+        if (params.target_bed_file){
             dragen_mode_args += " --sv-exome true --sv-call-regions-bed inputs/${dragen_inputs.target_bed_file} --vc-target-bed inputs/${dragen_inputs.target_bed_file}"
         } else {
             dragen_mode_args += " --enable-cnv true --cnv-somatic-enable-het-calling true --cnv-enable-ref-calls false --cnv-population-b-allele-vcf inputs/${dragen_inputs.pop_af_vcf}${dux4caller}"
