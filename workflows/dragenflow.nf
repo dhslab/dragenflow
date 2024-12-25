@@ -170,10 +170,10 @@ workflow DRAGENFLOW {
     ch_input_data   = Channel.empty()
 
     // Parse mastersheet and get meta hash and inputs.
-    SAMPLESHEET_CHECK(Channel.fromPath(params.input), data_path)
-    ch_versions = ch_versions.mix(SAMPLESHEET_CHECK.out.versions)
+//    SAMPLESHEET_CHECK(Channel.fromPath(params.input), data_path)
+//    ch_versions = ch_versions.mix(SAMPLESHEET_CHECK.out.versions)
 
-    SAMPLESHEET_CHECK.out.csv
+    Channel.fromPath(params.input) //SAMPLESHEET_CHECK.out.csv
     .splitCsv ( header:true, sep:',', quote:'"' )
     .map { create_samplesheet(it) }
     .groupTuple()
