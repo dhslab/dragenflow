@@ -331,7 +331,7 @@ workflow DRAGENFLOW {
 
             if (params.workflow == 'germline'){ 
                 GERMLINE(ch_input_data, ch_dragen_inputs)
-                ch_versions = ch_versions.mix(ALIGN.out.versions)
+                ch_versions = ch_versions.mix(GERMLINE.out.versions)
             }
 
         }
