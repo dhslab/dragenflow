@@ -2,7 +2,7 @@ process DRAGEN_MULTIALIGN {
     tag "${meta.id}"
     label 'dragen'
     label 'dragenalign'
-    container "${params.dragen_container}"
+    container "${ext.dragen_aws_image}" ?: "${params.dragen_container}"
     publishDir "$params.outdir/${meta.id}/", saveAs: { filename -> filename == "versions.yml" ? null : filename.split('/')[1] }, mode:'copy'
 
     input:
