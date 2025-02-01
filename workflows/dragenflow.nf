@@ -36,6 +36,7 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 // SUBWORKFLOWS
 //
 include { ALIGN                     } from '../subworkflows/local/align.nf'
+include { GERMLINE                  } from '../subworkflows/local/germline.nf'
 include { GATHER_FASTQS             } from '../subworkflows/local/gather_fastqs.nf'
 include { METHYLATION               } from '../subworkflows/local/methylation.nf'
 include { RNASEQ                    } from '../subworkflows/local/rna_seq.nf'
@@ -325,6 +326,11 @@ workflow DRAGENFLOW {
 
             if (params.workflow == 'align' || (params.workflow == 'idtumis' && params.target_bed_file != null)) {
                 ALIGN(ch_input_data, ch_dragen_inputs)
+                ch_versions = ch_versions.mix(ALIGN.out.versions)
+            }
+
+            if (params.workflow == 'germline'){ 
+                GERMLINE(ch_input_data, ch_dragen_inputs)
                 ch_versions = ch_versions.mix(ALIGN.out.versions)
             }
 
