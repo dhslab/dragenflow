@@ -84,7 +84,7 @@ process DRAGEN_MULTIALIGN {
         }
 
     } else if (params.workflow == "germline"){
-        dragen_mode_args += " --enable-sv true --sv-output-contigs true --sv-use-overlap-pair-evidence true"
+        dragen_mode_args += " --enable-variant-caller true --enable-sv true --sv-output-contigs true --sv-use-overlap-pair-evidence true"
         if (params.target_bed_file){
             dragen_mode_args += " --sv-exome true --sv-call-regions-bed inputs/${dragen_inputs.target_bed_file} --vc-target-bed inputs/${dragen_inputs.target_bed_file}"
         } else {
