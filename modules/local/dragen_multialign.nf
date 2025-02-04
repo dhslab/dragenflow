@@ -83,6 +83,10 @@ process DRAGEN_MULTIALIGN {
             dragen_mode_args += " --enable-cnv true --cnv-somatic-enable-het-calling true --cnv-enable-ref-calls false --cnv-population-b-allele-vcf inputs/${dragen_inputs.pop_af_vcf}${dux4caller}"
         }
 
+        if (params.nirvana == false){
+            dragen_mode_args += " --vc-skip-germline-tagging true"
+        }
+
     } else if (params.workflow == "germline"){
         dragen_mode_args += " --enable-variant-caller true --enable-sv true --sv-output-contigs true --sv-use-overlap-pair-evidence true"
         if (params.target_bed_file){
