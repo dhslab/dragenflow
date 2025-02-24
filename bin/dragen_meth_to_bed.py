@@ -1,13 +1,8 @@
-#!/usr/bin/env python3
-
 import pandas as pd
 import pyranges as pr
 import argparse
 import gzip
 import os, sys
-
-# add version 
-__version__ = '0.1.0'
 
 def process_file(input_file, output_file):
     # Read the file into a DataFrame
@@ -43,21 +38,21 @@ def process_file(input_file, output_file):
 
     gr = pr.PyRanges(grouped)
     sorted_gr = gr.sort()
+    sorted_df = sorted_gr.df  # Convert PyRanges to a pandas DataFrame
+    sorted_df["End"] = sorted_df["End"] - 1
 
     # Determine if output should be gzipped
     if output_file and output_file.endswith('.gz'):
-        sorted_gr.df.to_csv(output_file, sep='\t', columns=['Chromosome', 'Start', 'End', 'ratio', 'total'], header=False, index=False, compression='gzip')
+        sorted_df.to_csv(output_file, sep='\t', columns=['Chromosome', 'Start', 'End', 'ratio', 'total'], header=False, index=False, compression='gzip')
     elif output_file:
-        sorted_gr.df.to_csv(output_file, sep='\t', columns=['Chromosome', 'Start', 'End', 'ratio', 'total'], header=False, index=False)
+        sorted_df.to_csv(output_file, sep='\t', columns=['Chromosome', 'Start', 'End', 'ratio', 'total'], header=False, index=False)
     else:
-        sorted_gr.df.to_csv(sys.stdout, sep='\t', columns=['Chromosome', 'Start', 'End', 'ratio', 'total'], header=False, index=False)
+        sorted_df.to_csv(sys.stdout, sep='\t', columns=['Chromosome', 'Start', 'End', 'ratio', 'total'], header=False, index=False)
 
 def main():
     parser = argparse.ArgumentParser(description="Process a file and output aggregated data.")
     parser.add_argument("input_file", help="Input file path")
     parser.add_argument("-o", "--output_file", type=str,default=None, help="Output file path (default: stdout)")
-    # add version
-    parser.add_argument('--version', action='version', version='%(prog)s ' + __version__)
 
     args = parser.parse_args()
 
