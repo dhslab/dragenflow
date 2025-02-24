@@ -5,19 +5,23 @@
 **nf-core/dragenflow** is a bioinformatics pipeline that runs a variety of dragen commands and workflows for downstream analysis
 
 ## Pipeline Summary:
+
 all workflows:
+
 - samplesheet check
 - make fasqlists (from reads/crams/bams)
 - concatenate fastqlists
 - run dragen
 
 rna downstream analysis:
+
 - get sizes file and strandedness
 - annotate rnaseq
 - bedtools genomecov
 - ucsc bedclip, bedgraph to bigwig
 
 tumor downstream analysis
+
 - annotate small variants
 
 <!-- TODO nf-core:
@@ -50,41 +54,44 @@ Each row represents a fastq file (single-end) or a pair of fastq files (paired e
 
 ### Samplesheet Format
 
->**If running with mgi samplesheet:**
+> **If running with mgi samplesheet:**
 >
->Pass flag --mgi true, and use Samplemap2.csv with the following columns:
->```csv
->FASTQ Path - Read 1,FASTQ Path - Read 2,Flowcell ID,Index Sequence,Flowcell Lane,ESP ID,Pool Name,Species,Illumina Sample Type,Library Type,Library Name,Date Complete,Total Reads,Total Bases,Avg >Q Score Read 1,Avg Q Score Read 2,% >Q30 Read 1,% >Q30 Read 2,PhiX Error Rate Read 1,PhiX Error Rate Read 2,% Pass Filter Clusters Read 1,% Pass Filter Clusters Read 2
->```
+> Pass flag --mgi true, and use Samplemap2.csv with the following columns:
 >
->**If running with custom samplesheet:**
+> ```csv
+> FASTQ Path - Read 1,FASTQ Path - Read 2,Flowcell ID,Index Sequence,Flowcell Lane,ESP ID,Pool Name,Species,Illumina Sample Type,Library Type,Library Name,Date Complete,Total Reads,Total Bases,Avg >Q Score Read 1,Avg Q Score Read 2,% >Q30 Read 1,% >Q30 Read 2,PhiX Error Rate Read 1,PhiX Error Rate Read 2,% Pass Filter Clusters Read 1,% Pass Filter Clusters Read 2
+> ```
 >
->First column should be id, remaining columns are data type, or a combination of data types (read1,read2/bam/cram)
+> **If running with custom samplesheet:**
 >
->Examples:
->```csv
->id,read1,read2
->sample1,sample1_R1.fastq.gz,sample1_R1.fastq.gz
->sample2,sample2_R1.fastq.gz,sample2_R1.fastq.gz
->```
+> First column should be id, remaining columns are data type, or a combination of data types (read1,read2/bam/cram)
 >
->```csv
->id,bam,cram
->sample1,,sample1.cram
->sample2,sample2.bam,
->```
+> Examples:
+>
+> ```csv
+> id,read1,read2
+> sample1,sample1_R1.fastq.gz,sample1_R1.fastq.gz
+> sample2,sample2_R1.fastq.gz,sample2_R1.fastq.gz
+> ```
+>
+> ```csv
+> id,bam,cram
+> sample1,,sample1.cram
+> sample2,sample2.bam,
+> ```
 
 ### Run Command
 
->```bash
->nextflow run dhslab/dragenflow -r dev \
-   >-profile ris,<dragen2/dragen4/dragenaws> \
-   >--input /path/to/samplesheet \
-   >--outdir <OUTDIR> \ 
-   >--workflow <rna/5mc/align/somatic/tumor/idtumis>
->```
+> ```bash
+> nextflow run dhslab/dragenflow -r dev \
+> -profile ris,<dragen2/dragen4/dragenaws> \
+> --input /path/to/samplesheet \
+> --outdir <OUTDIR> \
+> --workflow <rna/5mc/align/somatic/tumor/idtumis>
+> ```
 
 ### Optional Parameters
+
 > --dragen_args \<dragen arguments> : provides additional arguments in dragen command
 >
 > --mgi true : pass if mgi samplesheet is used
@@ -92,6 +99,7 @@ Each row represents a fastq file (single-end) or a pair of fastq files (paired e
 > -bucket-dir \<path to s3 bucket dir> : pass if aws is used
 
 ### AWS
+
 > run the following commands:
 >
 > nextflow secrets set AWS_ACCESS_KEY \<aws access key>

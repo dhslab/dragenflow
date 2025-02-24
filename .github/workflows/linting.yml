@@ -97,12 +97,8 @@ jobs:
         if: ${{ always() }}
         run: echo ${{ github.event.pull_request.number }} > PR_number.txt
 
-      - name: Upload linting log file artifact
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v3
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: linting-logs
-          path: |
-            lint_log.txt
-            lint_results.md
-            PR_number.txt
+          name: my-artifact
+          path: ./path/to/artifact

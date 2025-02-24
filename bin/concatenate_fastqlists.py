@@ -40,4 +40,3 @@ with open(output_csv, "w", newline="") as f:
 with open(output_read_files, "w") as f:
     for read_file in read_files:
         f.write(read_file + "\n")
-
