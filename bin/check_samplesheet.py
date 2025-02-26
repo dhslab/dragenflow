@@ -132,7 +132,7 @@ def main():
         df_reads = reformat_mgi_samplesheet(args.samplesheet, args.dir)
 
     else:
-        df = pd.read_csv(args.samplesheet, sep=None, engine="python")
+        df = pd.read_csv(args.samplesheet, sep=",", engine="python")
 
         # Check 'id' field
         if df["id"].isnull().any():

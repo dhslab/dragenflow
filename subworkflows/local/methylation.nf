@@ -18,8 +18,8 @@ workflow METHYLATION {
     ch_versions = ch_versions.mix(MAKE_METH_BED.out.versions)
 
     // make channel for reference and index
-    ch_fasta_reference = params.fasta
-    ? Channel.fromPath("${params.fasta}*", checkIfExists: true).collect()
+    ch_fasta_reference = params.meth_fasta
+    ? Channel.fromPath("${params.meth_fasta}*", checkIfExists: true).collect()
     : Channel.empty()
 
     MAKE_METH_BIGWIG(DRAGEN_METHYLATION.out.dragen_output,ch_fasta_reference)

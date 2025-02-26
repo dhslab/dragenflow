@@ -1,7 +1,7 @@
 process MAKE_METH_BIGWIG {
     tag "$meta.id"
     label 'process_high'
-    container "ghcr.io/dhslab/baseimage:250222"
+    container "ghcr.io/dhslab/docker-baseimage:latest"
 
     publishDir "$params.outdir/${meta.id}/", saveAs: { filename -> filename == "versions.yml" ? null : filename }, mode:'copy'
 
