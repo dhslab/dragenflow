@@ -72,7 +72,7 @@ def make_runinfo_from_read(readpath):
                 read_name = line.strip()
                 indexes = read_name.split(" ")
                 # check if indexes are present in the read name and contain only ACGT characters
-                if len(indexes) > 1 and re.match("^[ACTG]+$", indexes[1].split(":")[-1]):
+                if len(indexes) > 1 and re.match("^[ACTG+]+$", indexes[1].split(":")[-1]):
                     index = indexes[1].split(":")[-1]
                     indexlist = indexlist + [index]
 
@@ -215,7 +215,6 @@ def main():
             read1_basename = os.path.basename(read1).split('.')[0]
             read2_basename = os.path.basename(read2).split('.')[0]
             rgid = rgid + f".{'.'.join(set({read1_basename,read2_basename}))}"
-            rglb = rglb + f".{'.'.join(set({read1_basename,read2_basename}))}"
 
         rgpl = f"{runinfo['RunId']}.{runinfo['Instrument']}.{runinfo['Flowcell']}.{runinfo['FlowcellType']}.{runinfo['FlowcellLot']}.{runinfo['ReagentLot']}.{runinfo['Read1Cycles']}x{runinfo['Index1Cycles']}x{runinfo['Index2Cycles']}x{runinfo['Read2Cycles']}"
 
