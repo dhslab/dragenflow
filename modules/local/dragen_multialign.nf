@@ -55,7 +55,7 @@ process DRAGEN_MULTIALIGN {
     def args = params.dragen_args ?: ""
 
     if (params.udiumi == true && dragen_inputs.target_bed_file){
-        dragen_mode_args = "--umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --umi-library-type random-simplex --umi-metrics-interval-file inputs/${dragen_inputs.target_bed_file} --read-trimmers adapter --trim-adapter-read1 inputs/${dragen_inputs.dragen_adapter1} --trim-adapter-read2 inputs/${dragen_inputs.dragen_adapter2}"
+        dragen_mode_args = "--umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --umi-library-type random-simplex --umi-metrics-interval-file inputs/${dragen_inputs.target_bed_file}"
         
     } else {
         dragen_mode_args = "--enable-duplicate-marking ${params.mark_duplicates} --read-trimmers adapter --trim-adapter-read1 inputs/${dragen_inputs.dragen_adapter1} --trim-adapter-read2 inputs/${dragen_inputs.dragen_adapter2}"
