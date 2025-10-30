@@ -55,13 +55,7 @@ process DRAGEN_MULTIALIGN {
     def args = params.dragen_args ?: ""
 
     if (params.udiumi == true && dragen_inputs.target_bed_file){
-        dragen_mode_args = "--umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --umi-library-type random-simplex --umi-metrics-interval-file inputs/${dragen_inputs.target_bed_file}"
-        if (params.solid_tumor){
-            dragen_mode_args += " --vc-enable-umi-solid true"
-        } else {
-            dragen_mode_args += " --vc-enable-umi-liquid true"
-        }
-        
+        dragen_mode_args = "--umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --umi-library-type random-simplex --umi-metrics-interval-file inputs/${dragen_inputs.target_bed_file}"        
     } else if (params.workflow == "5-base"){
         dragen_mode_args = "--methylation-conversion illumina --methylation-generate-cytosine-report true --methylation-keep-ref-cytosine true --methylation-compress-cx-report true --umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --enable-variant-caller true --vc-systematic-noise inputs/${dragen_inputs.snv_noisefile} --vc-enable-triallelic-filter false --vc-combine-phased-variants-distance 3"
 
@@ -189,6 +183,13 @@ process DRAGEN_MULTIALIGN {
 
     if (params.udiumi == true && dragen_inputs.target_bed_file){
         dragen_mode_args = "--umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --umi-library-type random-simplex --umi-metrics-interval-file inputs/${dragen_inputs.target_bed_file}"
+        
+        if (params.solid_tumor){
+            dragen_mode_args += " --vc-enable-umi-solid true"
+        } else {
+            dragen_mode_args += " --vc-enable-umi-liquid true"
+        }
+
     } else if (params.workflow == "5-base"){
         dragen_mode_args = "--methylation-conversion illumina --methylation-generate-cytosine-report true --methylation-keep-ref-cytosine true --methylation-compress-cx-report true --umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --enable-variant-caller true --vc-systematic-noise inputs/${dragen_inputs.snv_noisefile} --vc-enable-triallelic-filter false --vc-combine-phased-variants-distance 3"
 
