@@ -16,7 +16,7 @@ process DRAGEN_MULTIALIGN {
     script:
     def input = ""
     if (type == 'fastq') {
-        if (params.workflow == "rna" || params.workflow == "tumor"){
+        if (params.workflow == "rna" || params.workflow == "tumor" || params.workflow == "5-base" ){
             input = "--tumor-fastq-list ${meta.id}.fastq_list.csv --tumor-fastq-list-sample-id ${meta.id}"
         } else if (params.workflow == "5mc" || params.workflow == "germline" || params.workflow == "align") {
             input = "--fastq-list ${meta.id}.fastq_list.csv --fastq-list-sample-id ${meta.id}"
@@ -24,7 +24,7 @@ process DRAGEN_MULTIALIGN {
             input = "--tumor-fastq-list ${meta.tumor}.fastq_list.csv --tumor-fastq-list-sample-id ${meta.tumor} --fastq-list ${meta.normal}.fastq_list.csv --fastq-list-sample-id ${meta.normal}"
         }
     } else if (type == 'cram') {
-        if (params.workflow == "rna" || params.workflow == "tumor"){
+        if (params.workflow == "rna" || params.workflow == "tumor" || params.workflow == "5-base" ){
             input = "--tumor-cram-input ${meta.cram}"
         } else if (params.workflow == "5mc" || params.workflow == "germline" || params.workflow == "align") {
             input = "--cram-input ${meta.cram}"
@@ -34,7 +34,7 @@ process DRAGEN_MULTIALIGN {
         input += " --cram-reference inputs/${dragen_inputs.input_cram_reference}"
     }
     if (type == 'bam') {
-        if (params.workflow == "rna" || params.workflow == "tumor"){
+        if (params.workflow == "rna" || params.workflow == "tumor" || params.workflow == "5-base" ){
             input = "--tumor-bam-input ${meta.bam}"
         } else if (params.workflow == "5mc" || params.workflow == "germline" || params.workflow == "align") {
             input = "--bam-input ${meta.bam}"
@@ -56,7 +56,24 @@ process DRAGEN_MULTIALIGN {
 
     if (params.udiumi == true && dragen_inputs.target_bed_file){
         dragen_mode_args = "--umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --umi-library-type random-simplex --umi-metrics-interval-file inputs/${dragen_inputs.target_bed_file}"
+        if (params.solid_tumor){
+            dragen_mode_args += " --vc-enable-umi-solid true"
+        } else {
+            dragen_mode_args += " --vc-enable-umi-liquid true"
+        }
         
+    } else if (params.workflow == "5-base"){
+        dragen_mode_args = "--methylation-conversion illumina --methylation-generate-cytosine-report true --methylation-keep-ref-cytosine true --methylation-compress-cx-report true --umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --enable-variant-caller true --vc-systematic-noise inputs/${dragen_inputs.snv_noisefile} --vc-enable-triallelic-filter false --vc-combine-phased-variants-distance 3"
+
+        if (params.solid_tumor){
+            dragen_mode_args += " --vc-enable-umi-solid true"
+        } else {
+            dragen_mode_args += " --vc-enable-umi-liquid true"
+        }
+        if (params.target_bed_file){
+            dragen_mode_args += " --umi-metrics-interval-file inputs/${dragen_inputs.target_bed_file} --vc-target-bed inputs/${dragen_inputs.target_bed_file} --dbsnp inputs/${dragen_inputs.dbsnp}"
+    }
+
     } else {
         dragen_mode_args = "--enable-duplicate-marking ${params.mark_duplicates} --read-trimmers adapter --trim-adapter-read1 inputs/${dragen_inputs.dragen_adapter1} --trim-adapter-read2 inputs/${dragen_inputs.dragen_adapter2}"
     }
@@ -98,7 +115,14 @@ process DRAGEN_MULTIALIGN {
 
     } else if (params.workflow == "align"){
         dragen_mode_args += " --enable-variant-caller false --enable-sv false --enable-cnv false"
-    }
+    } else if (params.workflow == "5-base"){
+        if (params.nirvana){
+            dragen_mode_args += " --vc-enable-germline-tagging true"
+        } else {
+            dragen_mode_args += " --vc-skip-germline-tagging true"
+        }
+
+    } 
 
     if (params.nirvana){
         dragen_mode_args += " --enable-variant-annotation true --variant-annotation-assembly GRCh38 --variant-annotation-data inputs/${dragen_inputs.nirvana}"
@@ -106,7 +130,7 @@ process DRAGEN_MULTIALIGN {
 
     """
     mkdir dragen && \\
-    ${task.ext.dragen_exe_path}/dragen -r inputs/${dragen_inputs.reference} ${specified_sex} ${input} ${intermediate_dir} ${args_license}\\
+    ${task.ext.dragen_exe_path}/dragen -r inputs/${dragen_inputs.reference} ${specified_sex} ${input} ${intermediate_dir} ${hotspotvcf} ${args_license} \\
                 --enable-map-align true \\
                 --enable-sort true \\
                 --enable-bam-indexing true \\
@@ -125,7 +149,7 @@ process DRAGEN_MULTIALIGN {
     stub:
     def input = ""
     if (type == 'fastq') {
-        if (params.workflow == "rna" || params.workflow == "tumor"){
+        if (params.workflow == "rna" || params.workflow == "tumor" || params.workflow == "5-base" ){
             input = "--tumor-fastq-list ${meta.id}.fastq_list.csv --tumor-fastq-list-sample-id ${meta.id}"
         } else if (params.workflow == "5mc" || params.workflow == "germline" || params.workflow == "align") {
             input = "--fastq-list ${meta.id}.fastq_list.csv --fastq-list-sample-id ${meta.id}"
@@ -133,7 +157,7 @@ process DRAGEN_MULTIALIGN {
             input = "--tumor-fastq-list ${meta.tumor}.fastq_list.csv --tumor-fastq-list-sample-id ${meta.tumor} --fastq-list ${meta.normal}.fastq_list.csv --fastq-list-sample-id ${meta.normal}"
         }
     } else if (type == 'cram') {
-        if (params.workflow == "rna" || params.workflow == "tumor"){
+        if (params.workflow == "rna" || params.workflow == "tumor" || params.workflow == "5-base" ){
             input = "--tumor-cram-input ${meta.cram}"
         } else if (params.workflow == "5mc" || params.workflow == "germline" || params.workflow == "align") {
             input = "--cram-input ${meta.cram}"
@@ -143,7 +167,7 @@ process DRAGEN_MULTIALIGN {
         input += " --cram-reference inputs/${dragen_inputs.input_cram_reference}"
     }
     if (type == 'bam') {
-        if (params.workflow == "rna" || params.workflow == "tumor"){
+        if (params.workflow == "rna" || params.workflow == "tumor" || params.workflow == "5-base" ){
             input = "--tumor-bam-input ${meta.bam}"
         } else if (params.workflow == "5mc" || params.workflow == "germline" || params.workflow == "align") {
             input = "--bam-input ${meta.bam}"
@@ -171,6 +195,18 @@ process DRAGEN_MULTIALIGN {
         } else {
             dragen_mode_args += " --vc-enable-umi-liquid true"
         }
+
+    } else if (params.workflow == "5-base"){
+        dragen_mode_args = "--methylation-conversion illumina --methylation-generate-cytosine-report true --methylation-keep-ref-cytosine true --methylation-compress-cx-report true --umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --enable-variant-caller true --vc-systematic-noise inputs/${dragen_inputs.snv_noisefile} --vc-enable-triallelic-filter false --vc-combine-phased-variants-distance 3"
+
+        if (params.solid_tumor){
+            dragen_mode_args += " --vc-enable-umi-solid true"
+        } else {
+            dragen_mode_args += " --vc-enable-umi-liquid true"
+        }
+        if (params.target_bed_file){
+            dragen_mode_args += " --umi-metrics-interval-file inputs/${dragen_inputs.target_bed_file} --vc-target-bed inputs/${dragen_inputs.target_bed_file} --dbsnp inputs/${dragen_inputs.dbsnp}"
+    }
 
     } else {
         dragen_mode_args = "--enable-duplicate-marking ${params.mark_duplicates} --read-trimmers adapter --trim-adapter-read1 inputs/${dragen_inputs.dragen_adapter1} --trim-adapter-read2 inputs/${dragen_inputs.dragen_adapter2}"
@@ -207,8 +243,14 @@ process DRAGEN_MULTIALIGN {
 
     } else if (params.workflow == "align"){
         dragen_mode_args += " --enable-variant-caller false --enable-sv false --enable-cnv false"
-    }
+    } else if (params.workflow == "5-base"){
+        if (params.nirvana){
+            dragen_mode_args += " --vc-enable-germline-tagging true"
+        } else {
+            dragen_mode_args += " --vc-skip-germline-tagging true"
+        }
 
+    } 
     if (params.nirvana){
         dragen_mode_args += " --enable-variant-annotation true --variant-annotation-assembly GRCh38 --variant-annotation-data inputs/${dragen_inputs.nirvana}"
     }

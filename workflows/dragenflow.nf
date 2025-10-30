@@ -42,6 +42,7 @@ include { METHYLATION               } from '../subworkflows/local/methylation.nf
 include { RNASEQ                    } from '../subworkflows/local/rna_seq.nf'
 include { SOMATIC                   } from '../subworkflows/local/somatic.nf'
 include { TUMOR                     } from '../subworkflows/local/tumor.nf'
+include { FIVE_BASE                 } from '../subworkflows/local/five_base.nf'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -313,6 +314,16 @@ workflow DRAGENFLOW {
 
             ch_dragen_inputs = Channel.value(stageFileset(params.dragen_inputs))
 
+            if (params.workflow == '5-base') {
+            // Stage Dragen input files
+            params.dragen_inputs.reference = params.dragen_inputs.five_base_reference
+            params.dragen_inputs.five_base_reference = null
+            ch_dragen_inputs = Channel.value(stageFileset(params.dragen_inputs))
+
+            FIVE_BASE(ch_input_data, ch_dragen_inputs)
+            ch_versions = ch_versions.mix(FIVE_BASE.out.versions)
+            }
+
             if (params.workflow == 'rna') {
                 RNASEQ(ch_input_data, ch_dragen_inputs)
                 ch_versions = ch_versions.mix(RNASEQ.out.versions)
@@ -333,7 +344,6 @@ workflow DRAGENFLOW {
                 GERMLINE(ch_input_data, ch_dragen_inputs)
                 ch_versions = ch_versions.mix(GERMLINE.out.versions)
             }
-
         }
     }
 
