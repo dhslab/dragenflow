@@ -57,6 +57,68 @@ include { CONCATENATE_FASTQLISTS    } from '../modules/local/concatenate_fastqli
 include { MULTIQC                     } from '../modules/nf-core/multiqc/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
+
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    CREATE CHANNELS FOR INPUT PARAMETERS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+// DRAGEN reference directory
+ch_reference_dir = params.refdir
+    ? Channel.fromPath(params.refdir, type: 'dir', checkIfExists: true).collect()
+    : Channel.empty()
+
+// DRAGEN adapter sequences for read 1
+ch_adapter1_file = params.adapter1
+    ? Channel.fromPath(params.adapter1, checkIfExists: true).collect()
+    : []
+
+// DRAGEN adapter sequences for read 2
+ch_adapter2_file = params.adapter2
+    ? Channel.fromPath(params.adapter2, checkIfExists: true).collect()
+    : []
+
+// DRAGEN intermediate directory
+if (params.intermediate_dir?.toString()?.startsWith('/staging')) {
+    ch_intermediate_dir = Channel.of(params.intermediate_dir).map{ [ it, [] ] }.collect()
+} else if (params.intermediate_dir) {
+    ch_intermediate_dir = Channel.fromPath(params.intermediate_dir).map{ [ [], it ] }.collect()
+} else {
+    ch_intermediate_dir = [ [], [] ]
+}
+
+// DRAGEN hotspots
+ch_dragen_hotspots = params.dragen_hotspots
+    ? Channel.fromPath("${params.dragen_hotspots}*", checkIfExists: true).collect()
+    : []
+
+// DRAGEN tandem duplications
+ch_dragen_tandem_dup_hotspots = params.dragen_tandem_dup_hotspots
+    ? Channel.fromPath(params.dragen_tandem_dup_hotspots, checkIfExists: true).collect()
+    : []
+
+// SNV systematic noise BED file
+ch_snv_noisefile = params.snv_noisefile
+    ? Channel.fromPath(params.snv_noisefile, checkIfExists: true).collect()
+    : []
+
+// SV systematic noise BED file
+ch_sv_noisefile = params.sv_noisefile
+    ? Channel.fromPath(params.sv_noisefile, checkIfExists: true).collect()
+    : []
+
+// High confidence CNV VCF file
+ch_cnv_population_vcf = params.cnv_population_vcf
+    ? Channel.fromPath(params.cnv_population_vcf, checkIfExists: true).collect()
+    : []
+
+// CRAM reference file
+ch_cram_reference = params.cram_reference
+    ? Channel.fromPath("${params.cram_reference}*", checkIfExists: true).collect()
+    : []
+
+
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     RUN MAIN WORKFLOW
