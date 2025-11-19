@@ -1,4 +1,4 @@
-process ANNOTATE_RNASEQ {
+process ANNOTATE_EXPRESSION_TABLES {
     tag "$meta.id"
     label 'process_low'
     container "ghcr.io/dhslab/docker-python3:240301"

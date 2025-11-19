@@ -13,6 +13,7 @@ process DRAGEN_MULTIALIGN {
     tuple val(meta), path(reads, stageAs: "fastq_files/*"), path(fastq_list), path(alignment_file)
     tuple val(intermediate_directory_value), path(intermediate_directory)
     path(reference_dir)
+    path(dbsnp)
     path(adapter1)
     path(adapter2)
     path(cram_reference)
@@ -27,6 +28,7 @@ process DRAGEN_MULTIALIGN {
 
     output:
     tuple val(meta), path ("dragen/*"), emit: dragen_output
+    path("dragen/${meta.id}_usage.txt"), emit: usage, optional: true
     path "versions.yml",    emit: versions
 
     script:
@@ -40,7 +42,7 @@ process DRAGEN_MULTIALIGN {
             error("Input file is not a BAM, CRAM, or CSV file.")
         ].join(' ').trim()
 
-    } else if (params.workflow == "5mc" || params.workflow == "germline" || params.workflow == "align") {
+    } else if (params.workflow == "bsseq" || params.workflow == "germline" || params.workflow == "align") {
         input = [
             alignment_file.find{ it ==~ /.*\.bam$/  }?.with{ "--bam-input ${it}"  }                                        ?:
             alignment_file.find{ it ==~ /.*\.cram$/ }?.with{ "--cram-input ${it}" }                                        ?:
@@ -57,25 +59,28 @@ process DRAGEN_MULTIALIGN {
     }
 
     def alignment_params = [
+        task.ext.dragen_args                          ?: "",
         task.ext.dragen_license_args                  ?: "",
-        meta.sex?.toLowerCase() in ['male', 'female'] ? "--sample-sex ${meta.sex}"                                            : "",
-        reference_dir                                 ? "--ref-dir ${reference_dir}"                                          : "",
-        adapter1                                      ? "--trim-adapter-read1 ${adapter1}"                                    : "",
-        adapter2                                      ? "--trim-adapter-read2 ${adapter2}"                                    : "",
-        params.alignment_file_format ? "--output-format ${params.alignment_file_format}"                                      : "",
-        params.umi ? "--umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --umi-library-type ${params.umi}" : "",
-        params.umi && target_bed ? "--umi-metrics-interval-file ${target_bed}"                                                : "",
-        params.mark_duplicates ? "--enable-duplicate-marking true"                                                            : "--enable-duplicate-marking false",
-        params.umi && params.solid_tumor ? "--vc-enable-umi-solid true"                                                       : "",
-        params.umi && params.liquid_tumor ? "--vc-enable-umi-liquid true"                                                     : "",
-        hotspots                                      ? "--vc-somatic-hotspots ${hotspots.min{ it.toString().length() }}"     : "",
-        cram_reference                                ? "--cram-reference ${cram_reference.min{ it.toString().length() }}"    : "",
-        sv_noise_file                                 ? "--sv-systematic-noise ${sv_noise_file}"                              : "",
-        snv_noise_file                                ? "--vc-systematic-noise ${snv_noise_file}"                             : "",
         intermediate_directory                        ? "--intermediate-results-dir ${intermediate_directory}"                : "",
         intermediate_directory_value                  ? "--intermediate-results-dir ${intermediate_directory_value}"          : "",
+        reference_dir                                 ? "--ref-dir ${reference_dir}"                                          : "",
+        cram_reference                                ? "--cram-reference ${cram_reference.min{ it.toString().length() }}"    : "",
+        dbsnp                                         ? "--dbsnp ${dbsnp}"                                                    : "",
+        params.alignment_file_format                  ? "--output-format ${params.alignment_file_format}"                     : "",
+        meta.sex?.toLowerCase() in ['male', 'female'] ? "--sample-sex ${meta.sex}"                                            : "",
+        adapter1 && adapter2                          ? "--read-trimmers adapter --trim-adapter-read1 ${adapter1} --trim-adapter-read2 ${adapter2}" : "",
+        params.umi                                    ? "--umi-enable true --umi-library-type=${params.umi}"                  : "",
+        params.umi && params.readfamilysize           ? "--umi-min-supporting-reads ${readfamilysize}"                        : "",
+        params.umi && target_bed                      ? "--umi-metrics-interval-file ${target_bed}"                           : "",
+        params.umi && liquid_tumor                    ? "--vc-enable-umi-liquid true"                                         : "",
+        params.umi && solid_tumor                     ? "--vc-enable-umi-solid true"                                          : "",
+        hotspots                                      ? "--vc-somatic-hotspots ${hotspots.min{ it.toString().length() }}"     : "",
+        params.variant_caller && target_bed           ? "--vc-target-bed ${target_bed}"                                       : "",              
+        snv_noise_file                                ? "--vc-systematic-noise ${snv_noise_file}"                             : "",
+        sv_noise_file                                 ? "--sv-systematic-noise ${sv_noise_file}"                              : "",
+        sv_caller && target_bed                       ? "--sv-target-bed ${target_bed} --sv-exome true"                       : "",
+        cnv_population_vcf                            ? "--cnv-population-b-allele-vcf ${cnv_population_vcf}"                 : "",
         params.dragen_cnv_filter_length               ? "--cnv-filter-length ${params.dragen_cnv_filter_length}"              : "",
-        params.dux4caller                             ? "--enable-dux4-caller true --enable-ploidy-estimator true"            : "",
         params.dragen_cnv_merge_distance              ? "--cnv-merge-distance ${params.dragen_cnv_merge_distance}"            : "",
         tandem_duplications                           ? "--sv-somatic-ins-tandup-hotspot-regions-bed ${tandem_duplications}"  : "",
         nirvana_path ? "--enable-variant-annotation true --variant-annotation-assembly ${params.nirvana_assembly} --variant-annotation-data ${nirvana_path}" : "",
@@ -94,6 +99,12 @@ process DRAGEN_MULTIALIGN {
                 ${alignment_params} \\
                 ${input} \\
                 --output-directory ./dragen --force --output-file-prefix ${meta.id}
+
+    # Copy and rename DRAGEN usage
+    find dragen/ \\
+        -type f \\
+        -name "*_usage.txt" \\
+        -exec mv "{}" "dragen/${meta.id}_usage.txt" \\;
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -129,26 +140,20 @@ process DRAGEN_MULTIALIGN {
     }
 
     def alignment_params = [
+        task.ext.dragen_args                          ?: "",
         task.ext.dragen_license_args                  ?: "",
-        meta.sex?.toLowerCase() in ['male', 'female'] ? "--sample-sex ${meta.sex}"                                            : "",
-        reference_dir                                 ? "--ref-dir ${reference_dir}"                                          : "",
-        adapter1                                      ? "--trim-adapter-read1 ${adapter1}"                                    : "",
-        adapter2                                      ? "--trim-adapter-read2 ${adapter2}"                                    : "",
-        params.alignment_file_format ? "--output-format ${params.alignment_file_format}"                                      : "",
-        params.umi ? "--umi-enable true --umi-min-supporting-reads ${params.readfamilysize} --umi-library-type ${params.umi}" : "",
-        params.umi && target_bed ? "--umi-metrics-interval-file ${target_bed}"                                                : "",
-        params.mark_duplicates ? "--enable-duplicate-marking true"                                                            : "--enable-duplicate-marking false",
-        params.umi && params.solid_tumor ? "--vc-enable-umi-solid true"                                                       : "",
-        params.umi && params.liquid_tumor ? "--vc-enable-umi-liquid true"                                                     : "",
-        hotspots                                      ? "--vc-somatic-hotspots ${hotspots.min{ it.toString().length() }}"     : "",
-        cram_reference                                ? "--cram-reference ${cram_reference.min{ it.toString().length() }}"    : "",
-        sv_noise_file                                 ? "--sv-systematic-noise ${sv_noise_file}"                              : "",
-        snv_noise_file                                ? "--vc-systematic-noise ${snv_noise_file}"                             : "",
         intermediate_directory                        ? "--intermediate-results-dir ${intermediate_directory}"                : "",
         intermediate_directory_value                  ? "--intermediate-results-dir ${intermediate_directory_value}"          : "",
-        params.dragen_cnv_filter_length               ? "--cnv-filter-length ${params.dragen_cnv_filter_length}"              : "",
-        params.dux4caller                             ? "--enable-dux4-caller true --enable-ploidy-estimator true"            : "",
-        params.dragen_cnv_merge_distance              ? "--cnv-merge-distance ${params.dragen_cnv_merge_distance}"            : "",
+        reference_dir                                 ? "--ref-dir ${reference_dir}"                                          : "",
+        cram_reference                                ? "--cram-reference ${cram_reference.min{ it.toString().length() }}"    : "",
+        params.alignment_file_format                  ? "--output-format ${params.alignment_file_format}"                     : "",
+        meta.sex?.toLowerCase() in ['male', 'female'] ? "--sample-sex ${meta.sex}"                                            : "",
+        adapter1 && adapter2                          ? "--read-trimmers adapter --trim-adapter-read1 ${adapter1} --trim-adapter-read2 ${adapter2}" : "",
+        params.umi && target_bed ? "--umi-metrics-interval-file ${target_bed}"                                                : "--enable-duplicate-marking false",
+        hotspots                                      ? "--vc-somatic-hotspots ${hotspots.min{ it.toString().length() }}"     : "",
+        snv_noise_file                                ? "--vc-systematic-noise ${snv_noise_file}"                             : "",
+        sv_noise_file                                 ? "--sv-systematic-noise ${sv_noise_file}"                              : "",
+        cnv_population_vcf                            ? "--cnv-population-b-allele-vcf ${cnv_population_vcf}"                 : "",
         tandem_duplications                           ? "--sv-somatic-ins-tandup-hotspot-regions-bed ${tandem_duplications}"  : "",
         nirvana_path ? "--enable-variant-annotation true --variant-annotation-assembly ${params.nirvana_assembly} --variant-annotation-data ${nirvana_path}" : "",
         nirvana_path ? "--vc-enable-germline-tagging true" : "--vc-skip-germline-tagging true"
@@ -166,6 +171,8 @@ process DRAGEN_MULTIALIGN {
                 ${alignment_params} \\
                 ${input} \\
                 --output-directory ./dragen --force --output-file-prefix ${meta.id} > dragen/command.txt
+
+    touch dragen/${meta.id}_usage.txt
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

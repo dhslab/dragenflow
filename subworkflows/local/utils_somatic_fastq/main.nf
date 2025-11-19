@@ -1,39 +1,4 @@
 
-workflow CAT_FASTQLISTS {
-    take:
-    ch_cat_fastqlists_input  //  channel: [ id, [ path(fastqlist1), fastqlist2, ... ] ]
-
-    main:
-    ch_cat_fastqlists_input = Channel.empty()
-    ch_cat_fastqlists_input
-        .map { id, meta, fastqlists -> [ id, meta ] }
-        .join(
-            ch_cat_fastqlists_input
-            .map { id, meta, fastqlists ->
-                def data = fastqlists.collectMany { file -> parseFastqList(file) }
-                if (!data.isEmpty()) {
-                    def header = data[0].keySet().join(',')
-                    def content = data.collect { row ->
-                        row.values().join(',')
-                    }.join('\n')
-                    [ id, header + '\n' + content + '\n' ]
-                }
-            }
-            .collectFile(
-                { id, content -> [ "${id}.fastq_list.csv", content + '\n' ] },
-                keepHeader: true,
-                newLine: false
-            )
-            .map{ filename -> [ filename.getName().replaceAll("\\.fastq_list\\.csv", ""), filename ] }
-        )
-        .map { id, meta, fastqfile -> [ meta, fastqfile ] }
-        .set { ch_cat_fastqlists_input }
-
-    emit:
-    fastqlist = ch_cat_fastqlists_input
-
-}
-
 workflow PREPARE_SOMATIC_FASTQS {
     take:
     ch_prepare_somatic_fastqs_input  //  channel: [ id, [ path(fastqlist1), fastqlist2, ... ] ]
@@ -47,7 +12,7 @@ workflow PREPARE_SOMATIC_FASTQS {
             normal: it[0].sample_type == 'normal'
         }.set { ch_prepare_somatic_fastqs_samples }
 
-    ch_prepare_somatic_fastqs_input = ch_prepare_somatic_fastqs_samples.tumor // first get tumor samples
+    ch_prepare_somatic_fastqs = ch_prepare_somatic_fastqs_samples.tumor // first get tumor samples
         .map { meta, reads, fastqlist, alignment_files ->
             [ meta.individual_id, meta, reads, fastqlist ]
         }
@@ -73,13 +38,8 @@ workflow PREPARE_SOMATIC_FASTQS {
             fastqlist: [ meta.id, meta, fastqlists ]
         }
         
-    ch_prepare_somatic_fastqs_output = ch_prepare_somatic_fastqs_input.reads
-        .join(
-            CAT_FASTQLISTS (
-                ch_prepare_somatic_fastqs_input.fastqlist
-            )
-            .fastqlist
-        )
+    ch_prepare_somatic_fastqs_output = ch_prepare_somatic_fastqs.reads
+        .join(CAT_FASTQLISTS(ch_prepare_somatic_fastqs.fastqlist).fastqlist)
         .map { meta, reads, fastqlist ->
             [ meta, reads, fastqlist, [] ]
         }
@@ -87,8 +47,44 @@ workflow PREPARE_SOMATIC_FASTQS {
     emit: 
     samples = ch_prepare_somatic_fastqs_output
 
+}
+
+workflow CAT_FASTQLISTS {
+    take:
+    ch_cat_fastqlists_input  //  channel: [ id, [ path(fastqlist1), fastqlist2, ... ] ]
+
+    main:
+    ch_cat_fastqlists_output = Channel.empty()
+
+    ch_cat_fastqlists_input
+        .map { id, meta, fastqlists -> [ id, meta ] }
+        .join(
+            ch_cat_fastqlists_input
+            .map { id, meta, fastqlists ->
+                def data = fastqlists.collectMany { file -> parseFastqList(file) }
+                if (!data.isEmpty()) {
+                    def header = data[0].keySet().join(',')
+                    def content = data.collect { row ->
+                        row.values().join(',')
+                    }.join('\n')
+                    [ id, header + '\n' + content + '\n' ]
+                }
+            }
+            .collectFile(
+                { id, content -> [ "${id}.fastq_list.csv", content + '\n' ] },
+                keepHeader: true,
+                newLine: false
+            )
+            .map{ filename -> [ filename.getName().replaceAll("\\.fastq_list\\.csv", ""), filename ] }
+        )
+        .map { id, meta, fastqfile -> [ meta, fastqfile ] }
+        .set { ch_cat_fastqlists_output }
+
+    emit:
+    fastqlist = ch_cat_fastqlists_output
 
 }
+
 /*
 ========================================================================================
     FUNCTIONS
