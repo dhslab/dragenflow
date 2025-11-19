@@ -1,7 +1,6 @@
 process DRAGEN_MULTIALIGN {
     tag "${meta.id}"
     label 'dragen'
-    label 'dragenalign'
     container "${ext.dragen_aws_image}" ?: "${params.dragen_container}"
     publishDir "$params.outdir/${meta.id}/", saveAs: { filename -> filename == "versions.yml" ? null : filename.split('/')[1] }, mode:'copy'
 
@@ -83,8 +82,8 @@ process DRAGEN_MULTIALIGN {
         params.dragen_cnv_filter_length               ? "--cnv-filter-length ${params.dragen_cnv_filter_length}"              : "",
         params.dragen_cnv_merge_distance              ? "--cnv-merge-distance ${params.dragen_cnv_merge_distance}"            : "",
         tandem_duplications                           ? "--sv-somatic-ins-tandup-hotspot-regions-bed ${tandem_duplications}"  : "",
-        nirvana_path ? "--enable-variant-annotation true --variant-annotation-assembly ${params.nirvana_assembly} --variant-annotation-data ${nirvana_path}" : "",
-        nirvana_path ? "--vc-enable-germline-tagging true" : "--vc-skip-germline-tagging true"
+        params.use_nirvana && nirvana_path ? "--enable-variant-annotation true --variant-annotation-assembly ${params.nirvana_assembly} --variant-annotation-data ${nirvana_path}" : "",
+        params.use_nirvana && nirvana_path ? "--vc-enable-germline-tagging true" : "--vc-skip-germline-tagging true"
     ].join(' ').trim()
 
     """
@@ -146,17 +145,26 @@ process DRAGEN_MULTIALIGN {
         intermediate_directory_value                  ? "--intermediate-results-dir ${intermediate_directory_value}"          : "",
         reference_dir                                 ? "--ref-dir ${reference_dir}"                                          : "",
         cram_reference                                ? "--cram-reference ${cram_reference.min{ it.toString().length() }}"    : "",
+        dbsnp                                         ? "--dbsnp ${dbsnp}"                                                    : "",
         params.alignment_file_format                  ? "--output-format ${params.alignment_file_format}"                     : "",
         meta.sex?.toLowerCase() in ['male', 'female'] ? "--sample-sex ${meta.sex}"                                            : "",
         adapter1 && adapter2                          ? "--read-trimmers adapter --trim-adapter-read1 ${adapter1} --trim-adapter-read2 ${adapter2}" : "",
-        params.umi && target_bed ? "--umi-metrics-interval-file ${target_bed}"                                                : "--enable-duplicate-marking false",
+        params.umi                                    ? "--umi-enable true --umi-library-type=${params.umi}"                  : "",
+        params.umi && params.readfamilysize           ? "--umi-min-supporting-reads ${readfamilysize}"                        : "",
+        params.umi && target_bed                      ? "--umi-metrics-interval-file ${target_bed}"                           : "",
+        params.umi && liquid_tumor                    ? "--vc-enable-umi-liquid true"                                         : "",
+        params.umi && solid_tumor                     ? "--vc-enable-umi-solid true"                                          : "",
         hotspots                                      ? "--vc-somatic-hotspots ${hotspots.min{ it.toString().length() }}"     : "",
+        params.variant_caller && target_bed           ? "--vc-target-bed ${target_bed}"                                       : "",              
         snv_noise_file                                ? "--vc-systematic-noise ${snv_noise_file}"                             : "",
         sv_noise_file                                 ? "--sv-systematic-noise ${sv_noise_file}"                              : "",
+        sv_caller && target_bed                       ? "--sv-target-bed ${target_bed} --sv-exome true"                       : "",
         cnv_population_vcf                            ? "--cnv-population-b-allele-vcf ${cnv_population_vcf}"                 : "",
+        params.dragen_cnv_filter_length               ? "--cnv-filter-length ${params.dragen_cnv_filter_length}"              : "",
+        params.dragen_cnv_merge_distance              ? "--cnv-merge-distance ${params.dragen_cnv_merge_distance}"            : "",
         tandem_duplications                           ? "--sv-somatic-ins-tandup-hotspot-regions-bed ${tandem_duplications}"  : "",
-        nirvana_path ? "--enable-variant-annotation true --variant-annotation-assembly ${params.nirvana_assembly} --variant-annotation-data ${nirvana_path}" : "",
-        nirvana_path ? "--vc-enable-germline-tagging true" : "--vc-skip-germline-tagging true"
+        params.use_nirvana && nirvana_path ? "--enable-variant-annotation true --variant-annotation-assembly ${params.nirvana_assembly} --variant-annotation-data ${nirvana_path}" : "",
+        params.use_nirvana && nirvana_path ? "--vc-enable-germline-tagging true" : "--vc-skip-germline-tagging true"
     ].join(' ').trim()
 
     """
