@@ -1,7 +1,7 @@
 process DRAGEN_MULTIALIGN {
     tag "${meta.id}"
     label 'dragen'
-    container "${ext.dragen_aws_image}" ?: "${params.dragen_container}"
+    container "${task.ext.dragen_container}"
     publishDir "$params.outdir/${meta.id}/", saveAs: { filename -> filename == "versions.yml" ? null : filename.split('/')[1] }, mode:'copy'
 
 //    input:
@@ -31,7 +31,7 @@ process DRAGEN_MULTIALIGN {
     path "versions.yml",    emit: versions
 
     script:
-    def exe_path = ['dragenaws', 'awsbatch'].any{ workflow.profile.contains(it) } ? "${params.aws_dragen_path}" : "${params.local_dragen_path}"
+    def exe_path = "${task.ext.dragen_path}" //['dragenaws', 'awsbatch'].any{ workflow.profile.contains(it) } ? "${params.aws_dragen_path}" : "${params.local_dragen_path}"
     def input = ""
     if (params.workflow == "rna" || params.workflow == "tumor"){
         input = [
@@ -58,7 +58,7 @@ process DRAGEN_MULTIALIGN {
     }
 
     def alignment_params = [
-        task.ext.dragen_args                          ?: "",
+        params.extra_dragen_args                      ?: "",
         task.ext.dragen_license_args                  ?: "",
         intermediate_directory                        ? "--intermediate-results-dir ${intermediate_directory}"                : "",
         intermediate_directory_value                  ? "--intermediate-results-dir ${intermediate_directory_value}"          : "",

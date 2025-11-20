@@ -56,6 +56,66 @@ workflow GATHER_ALIGNMENT_SAMPLES {
                                 .flatten()
 
     //
+    // Get CRAM/BAM files for processing
+    //
+    ch_crams_to_convert = Channel.empty()
+    ch_crams_to_align = Channel.empty()
+
+    if (params.workflow == 'somatic'){
+        ch_crams_to_convert = ch_crams_to_convert.mix(
+            ch_sample_alignment_meta
+                .filter{ it.bam || it.cram }
+                .map{ meta -> [ meta.subMap("id", "individual_id", "sample_type", "sample_id", "sex"), file(meta.bam ? "${meta.bam}*" : "${meta.cram}*", checkIfExists: true) ] }
+                .filter(it != [])
+        )
+    } else {
+        ch_crams_to_convert = ch_crams_to_convert.mix(
+            ch_sample_alignment_meta      
+                .filter{it.bam || it.cram}
+                .map{ meta -> [ meta.subMap("id", "individual_id", "sample_type", "sample_id", "sex"), file(meta.bam ? "${meta.bam}*" : "${meta.cram}*", checkIfExists: true) ] }
+                .filter{it != []}
+                .join(
+                    ch_sample_alignment_meta
+                        .filter{ it.read1 || it.fastq_list }
+                        .map{ meta -> [ meta.subMap("id", "individual_id", "sample_type", "sample_id", "sex"), 'reads' ] }
+                )
+                .map{ meta, alignments, reads -> [ meta, alignments ] }
+                .filter{it != []}
+        )
+    }
+
+    ch_crams_to_convert.dump(tag:'crams_to_convert', pretty:true)
+
+    //
+    //
+    // SUBWORKFLOW: Partition BAM/CRAM files that need to be converted to fastq and realigned. 
+    //              This retains run information and can handle bam/cram for the same sample.
+    //
+
+    PARTITION_ALIGNMENT_FILE (
+        ch_crams_to_convert, 
+        ch_cram_reference
+    )
+    ch_versions = ch_versions.mix(PARTITION_ALIGNMENT_FILE.out.versions)
+    
+    //
+    // MODULE: Convert CRAM files to FastQ
+    //
+    CONVERT_ALIGNMENT_FILE_TO_FASTQ (
+        PARTITION_ALIGNMENT_FILE.out.cram_files
+            .flatMap { meta, values ->
+                values.collect { val -> [meta, val] }
+            },
+        ch_cram_reference
+    )
+    ch_versions = ch_versions.mix(CONVERT_ALIGNMENT_FILE_TO_FASTQ.out.versions)
+
+    ch_gathered_fastqs = ch_gathered_fastqs.mix (
+        CONVERT_ALIGNMENT_FILE_TO_FASTQ.out.fastqs
+            .map{ meta, read1, read2 -> [ meta, read1, read2, [] ] }
+    )
+
+    //
     // Collect reads, fastq_list, and runinfo.
     //
     ch_gathered_fastqs = ch_gathered_fastqs
@@ -162,78 +222,11 @@ workflow GATHER_ALIGNMENT_SAMPLES {
                 )
                 .map { id, meta, fastq_list -> [ meta, fastq_list ] }
             )
-            .map{ meta, reads, fastq_list -> [ meta, reads.flatten(), fastq_list, [] ] }
+            .map{ meta, reads, fastq_list -> [ meta, reads.flatten(), fastq_list ] }
         )
 
-    /*
-    //
-    // Get CRAM/BAM files that can be directly realigned
-    //
-    ch_ = ch_gathered_samples.mix(
-                            ch_sample_alignment_meta
-                                .map { meta -> 
-                                    def validKeys = ['read1', 'read2', 'demux_path', 'cram', 'bam', 'fastq_list']
-                                    def item_count = meta.count { key, value -> (key in validKeys) && value }
-                                    if (item_count == 1){
-                                        return meta
-                                    }
-                                }
-                                .filter{ (it?.bam || it?.cram) && !(it?.read1 || it?.read2 || it?.demux_path || it?.fastq_list) }
-                                .map{ [ it, [], [], file(it.bam ? "${it.bam}*" : "${it.cram}*") ] }
-                            )
-   
-    //
-    // SUBWORKFLOW: Partition BAM/CRAM files that need to be converted to fastq and realigned. 
-    //              This retains run information and can handle bam/cram for the same sample.
-    //
-    ch_crams_to_partition = ch_sample_alignment_meta
-            .map { meta -> 
-                def validKeys = ['read1', 'read2', 'demux_path', 'cram', 'bam', 'fastq_list']
-                def item_count = meta.count { key, value -> (key in validKeys) && value }
-                if (item_count > 1){
-                    return meta
-                }
-            }
-            .filter{ it.bam || it.cram }
-            .flatMap { meta ->
-                    def outputs = []
-                    if (meta.cram) {
-                        outputs.add([meta, file("${meta.cram}*")])
-                    }
-                    if (meta.bam) {
-                        outputs.add([meta, file("${meta.bam}*")])
-                    }
-                    return outputs
-            }
-
-    PARTITION_ALIGNMENT_FILE (
-        ch_crams_to_partition,
-        ch_cram_reference
-    )
-    ch_versions = ch_versions.mix(PARTITION_ALIGNMENT_FILE.out.versions)
-    
-    //
-    // MODULE: Convert CRAM files to FastQ
-    //
-    CONVERT_ALIGNMENT_FILE_TO_FASTQ (
-        PARTITION_ALIGNMENT_FILE.out.cram_files
-            .flatMap { meta, values ->
-                values.collect { val -> [meta, val] }
-            },
-        ch_cram_reference
-    )
-    ch_versions = ch_versions.mix(CONVERT_ALIGNMENT_FILE_TO_FASTQ.out.versions)
-
-    ch_gathered_fastqs = ch_gathered_fastqs.mix (
-        CONVERT_ALIGNMENT_FILE_TO_FASTQ.out.fastqs
-            .map{ meta, read1, read2 -> [ meta, read1, read2, [] ] }
-    )
-    */
-
-    //ch_gathered_samples.dump(tag: 'gather_alignment_samples:ch_gathered_samples', pretty: true)
-
     emit:
-    samples  = ch_gathered_samples  // channel: [ val(meta), path(reads), path(fastq_list), path(alignment_file) ]
+    samples  = ch_gathered_samples.map { meta, reads, fastq_list -> [ meta, reads, fastq_list, [] ] }  // channel: [ val(meta), path(reads), path(fastq_list), path(alignment_file) ]
     versions = ch_versions           // channel: [ path(file) ]
 
 }

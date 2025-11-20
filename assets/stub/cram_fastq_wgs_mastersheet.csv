@@ -1,0 +1,4 @@
+id,cram,read1,read2
+10940-BM-lib1,assets/stub/crams/10940-BM-lib1_tumor.cram
+10929-BM-lib1,assets/stub/crams/10929-BM-lib1_input.cram
+10929-BM-lib1,,assets/stub/demux_fastq/10929-BM-lib1_S1_L007_R1_001.fastq.gz,assets/stub/demux_fastq/10929-BM-lib1_S1_L007_R2_001.fastq.gz

@@ -1,3 +1,0 @@
-id,uid,sample_type,bam,cram
-10929-BM-lib1,SOMATICTEST,tumor,/storage1/fs1/dspencer/Active/spencerlab/dhs/git/dragenflow/assets/stub/crams/10929-BM-lib1_input.bam,
-10940-BM-lib1,SOMATICTEST,normal,,/storage1/fs1/dspencer/Active/spencerlab/dhs/git/dragenflow/assets/stub/crams/10940-BM-lib1_input.cram

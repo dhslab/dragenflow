@@ -210,26 +210,29 @@ workflow DRAGENFLOW {
 
     ch_alignment_samples.dump(tag:'alignment_samples',pretty:true)
 
-    DRAGEN_MULTIALIGN (
-        ch_alignment_samples,
-        ch_intermediate_dir,
-        ch_reference_dir,
-        ch_dbsnp,
-        ch_adapter1_file,
-        ch_adapter2_file,
-        ch_cram_reference,
-        ch_sv_noisefile,
-        ch_snv_noisefile,
-        ch_hotspot_vcf,
-        ch_cnv_population_vcf,
-        ch_dragen_tandem_dup_hotspots,
-        ch_target_bed,
-        ch_annotation_gtf,
-        ch_nirvana_path
-    )
-    ch_versions     = ch_versions.mix(DRAGEN_MULTIALIGN.out.versions)
-    ch_dragen_usage = ch_dragen_usage.mix(DRAGEN_MULTIALIGN.out.usage)
 
+    if (params.run_dragen == true) {
+        DRAGEN_MULTIALIGN (
+            ch_alignment_samples,
+            ch_intermediate_dir,
+            ch_reference_dir,
+            ch_dbsnp,
+            ch_adapter1_file,
+            ch_adapter2_file,
+            ch_cram_reference,
+            ch_sv_noisefile,
+            ch_snv_noisefile,
+            ch_hotspot_vcf,
+            ch_cnv_population_vcf,
+            ch_dragen_tandem_dup_hotspots,
+            ch_target_bed,
+            ch_annotation_gtf,
+            ch_nirvana_path
+        )
+        ch_versions     = ch_versions.mix(DRAGEN_MULTIALIGN.out.versions)
+        ch_dragen_usage = ch_dragen_usage.mix(DRAGEN_MULTIALIGN.out.usage)
+    }
+    
     if (params.variant_caller == true) {
         ANNOTATE_VARIANTS (
             DRAGEN_MULTIALIGN.out.dragen_output,
