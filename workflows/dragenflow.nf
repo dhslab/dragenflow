@@ -13,7 +13,7 @@ include { PARSE_INPUT_SAMPLESHEET     } from '../modules/local/parse_input_sampl
 include { SAMPLESHEET_CHECK           } from '../modules/local/samplesheet_check.nf'
 
 include { GATHER_ALIGNMENT_SAMPLES      } from '../subworkflows/local/gather_alignment_samples.nf'
-include { PREPARE_SOMATIC_FASTQS        } from '../subworkflows/local/utils_somatic_fastq/'
+include { PREPARE_SOMATIC_FASTQS        } from '../subworkflows/local/gather_alignment_samples.nf'
 include { MAKE_HOTSPOT_VCF              } from '../modules/local/make_hotspot_vcf.nf'
 include { DRAGEN_MULTIALIGN             } from '../modules/local/dragen_multialign.nf'
 include { ANNOTATE_VARIANTS             } from '../modules/local/annotate_variants.nf'
@@ -67,11 +67,11 @@ if (params.intermediate_dir?.toString()?.startsWith('/staging')) {
 // DRAGEN hotspots
 ch_hotspot_vcf = params.hotspot_vcf
     ? Channel.fromPath("${params.hotspot_vcf}*", checkIfExists: true).collect()
-    : []
+    : Channel.empty()
 
 ch_hotspot_bed = params.hotspot_bed
     ? Channel.fromPath(params.hotspot_bed, checkIfExists: true).collect()
-    : []
+    : Channel.empty()
 
 // DRAGEN tandem duplications
 ch_dragen_tandem_dup_hotspots = params.dragen_tandem_dup_hotspots
@@ -109,8 +109,8 @@ ch_fasta_reference = params.fasta
     : Channel.empty()
 
 // Vep cache
-ch_vep_cache = params.vep_cache
-    ? Channel.fromPath(params.vep_cache, type: 'dir', checkIfExists: true).collect()
+ch_vepcache = params.vepcache
+    ? Channel.fromPath(params.vepcache, type: 'dir', checkIfExists: true).collect()
     : Channel.empty()
 
 // Cytobands
@@ -125,6 +125,11 @@ ch_annotation_gtf = params.annotation_gtf
 ch_nirvana_path = params.nirvana_path && params.use_nirvana == true
     ? Channel.fromPath(params.nirvana_path, type: 'dir', checkIfExists: true).collect()
     : []
+
+// Indicator channel to run dragen
+ch_run_dragen = params.run_dragen
+    ? Channel.value(params.run_dragen)
+    : Channel.empty()
 
 /*
 ~~~~~~~~~~~~~~~~~~
@@ -193,14 +198,12 @@ workflow DRAGENFLOW {
     ch_versions          = ch_versions.mix(GATHER_ALIGNMENT_SAMPLES.out.versions)
     ch_alignment_samples = ch_alignment_samples.mix(GATHER_ALIGNMENT_SAMPLES.out.samples)
 
-    if (params.hotspot_bed){
-        MAKE_HOTSPOT_VCF(
-            ch_hotspot_bed,
-            ch_fasta_reference
-        )
-        ch_versions = ch_versions.mix(MAKE_HOTSPOT_VCF.out.versions)
-        ch_hotspot_vcf = MAKE_HOTSPOT_VCF.out.hotspot_vcf
-    }
+    MAKE_HOTSPOT_VCF(
+        ch_hotspot_bed,
+        ch_fasta_reference
+    )
+    ch_versions = ch_versions.mix(MAKE_HOTSPOT_VCF.out.versions)
+    ch_hotspot_vcf = MAKE_HOTSPOT_VCF.out.hotspot_vcf
 
     if (params.workflow == 'somatic') {
         // for somatic workflow, need to assemble tumor and normal data
@@ -209,68 +212,58 @@ workflow DRAGENFLOW {
     }
 
     ch_alignment_samples.dump(tag:'alignment_samples',pretty:true)
-
-
-    if (params.run_dragen == true) {
-        DRAGEN_MULTIALIGN (
-            ch_alignment_samples,
-            ch_intermediate_dir,
-            ch_reference_dir,
-            ch_dbsnp,
-            ch_adapter1_file,
-            ch_adapter2_file,
-            ch_cram_reference,
-            ch_sv_noisefile,
-            ch_snv_noisefile,
-            ch_hotspot_vcf,
-            ch_cnv_population_vcf,
-            ch_dragen_tandem_dup_hotspots,
-            ch_target_bed,
-            ch_annotation_gtf,
-            ch_nirvana_path
-        )
-        ch_versions     = ch_versions.mix(DRAGEN_MULTIALIGN.out.versions)
-        ch_dragen_usage = ch_dragen_usage.mix(DRAGEN_MULTIALIGN.out.usage)
-    }
+  
+    DRAGEN_MULTIALIGN (
+        ch_alignment_samples,
+        ch_intermediate_dir,
+        ch_reference_dir,
+        ch_dbsnp,
+        ch_adapter1_file,
+        ch_adapter2_file,
+        ch_cram_reference,
+        ch_sv_noisefile,
+        ch_snv_noisefile,
+        ch_hotspot_vcf.ifEmpty([]),
+        ch_cnv_population_vcf,
+        ch_dragen_tandem_dup_hotspots,
+        ch_target_bed,
+        ch_annotation_gtf,
+        ch_nirvana_path
+    )
+    ch_versions     = ch_versions.mix(DRAGEN_MULTIALIGN.out.versions)
+    ch_dragen_usage = ch_dragen_usage.mix(DRAGEN_MULTIALIGN.out.usage)
     
-    if (params.variant_caller == true) {
-        ANNOTATE_VARIANTS (
-            DRAGEN_MULTIALIGN.out.dragen_output,
-            ch_fasta_reference,
-            ch_vep_cache
-        )
-        ch_versions = ch_versions.mix(ANNOTATE_VARIANTS.out.versions)
+    ANNOTATE_VARIANTS (
+        DRAGEN_MULTIALIGN.out.dragen_output,
+        ch_fasta_reference,
+        ch_vepcache
+    )
+    ch_versions = ch_versions.mix(ANNOTATE_VARIANTS.out.versions)
 
-        VARIANTS_TO_TSV (ANNOTATE_VARIANTS.out.vcf,Channel.value('vcf'))
-        ch_versions = ch_versions.mix(VARIANTS_TO_TSV.out.versions)
+    VARIANTS_TO_TSV (ANNOTATE_VARIANTS.out.vcf,Channel.value('vcf'))
+    ch_versions = ch_versions.mix(VARIANTS_TO_TSV.out.versions)
 
-    }
+    ANNOTATE_SV_VARIANTS (
+        DRAGEN_MULTIALIGN.out.dragen_output,
+        ch_fasta_reference,
+        ch_vepcache,
+        ch_cytobands
+    )
+    ch_versions = ch_versions.mix(ANNOTATE_VARIANTS.out.versions)
 
-    if (params.sv_caller == true) {
-        ANNOTATE_SV_VARIANTS (
-            DRAGEN_MULTIALIGN.out.dragen_output,
-            ch_fasta_reference,
-            ch_vep_cache,
-            ch_cytobands
-        )
-        ch_versions = ch_versions.mix(ANNOTATE_VARIANTS.out.versions)
+    SV_TO_TSV (ANNOTATE_SV_VARIANTS.out.vcf,Channel.value('sv'))
+    ch_versions = ch_versions.mix(SV_TO_TSV.out.versions)
 
-        SV_TO_TSV (ANNOTATE_SV_VARIANTS.out.vcf,Channel.value('sv'))
-        ch_versions = ch_versions.mix(SV_TO_TSV.out.versions)
-    }
+    ANNOTATE_CNV_VARIANTS (
+        DRAGEN_MULTIALIGN.out.dragen_output,
+        ch_fasta_reference,
+        ch_vepcache,
+        ch_cytobands
+    )
+    ch_versions = ch_versions.mix(ANNOTATE_CNV_VARIANTS.out.versions)
 
-    if (params.cnv_caller == true) {
-        ANNOTATE_CNV_VARIANTS (
-            DRAGEN_MULTIALIGN.out.dragen_output,
-            ch_fasta_reference,
-            ch_vep_cache,
-            ch_cytobands
-        )
-        ch_versions = ch_versions.mix(ANNOTATE_CNV_VARIANTS.out.versions)
-
-        CNV_TO_TSV (ANNOTATE_CNV_VARIANTS.out.vcf,Channel.value('cnv'))
-        ch_versions = ch_versions.mix(CNV_TO_TSV.out.versions)
-    }
+    CNV_TO_TSV (ANNOTATE_CNV_VARIANTS.out.vcf,Channel.value('cnv'))
+    ch_versions = ch_versions.mix(CNV_TO_TSV.out.versions)
 
     if (params.workflow == 'rna'){
         // Annotate gene and transcript tables

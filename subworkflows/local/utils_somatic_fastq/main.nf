@@ -37,51 +37,42 @@ workflow PREPARE_SOMATIC_FASTQS {
             reads: [ meta, reads ]
             fastqlist: [ meta.id, meta, fastqlists ]
         }
-        
+
+    ch_new = ch_prepare_somatic_fastqs.fastqlist
+    ch_new.view()
+
     ch_prepare_somatic_fastqs_output = ch_prepare_somatic_fastqs.reads
-        .join(CAT_FASTQLISTS(ch_prepare_somatic_fastqs.fastqlist).fastqlist)
+        .join(
+        ch_prepare_somatic_fastqs.fastqlist
+            .map { id, meta, fastqlists -> [ id, meta ] }
+                .join(
+                    ch_prepare_somatic_fastqs.fastqlist
+                    .map { id, meta, fastqlists ->
+                        def data = fastqlists.collectMany { file -> parseFastqList(file) }
+                        if (!data.isEmpty()) {
+                            def header = data[0].keySet().join(',')
+                            def content = data.collect { row ->
+                                row.values().join(',')
+                            }.join('\n')
+                            [ id, header + '\n' + content + '\n' ]
+                        }
+                    }
+                    .filter{ it != [] }
+                    .collectFile(
+                        { id, content -> [ "${id}.fastq_list.csv", content + '\n' ] },
+                        keepHeader: true,
+                        newLine: false
+                    )
+                    .map{ filename -> [ filename.getName().replaceAll("\\.fastq_list\\.csv", ""), filename ] }
+                )
+                .map { id, meta, fastqfile -> [ meta, fastqfile ] }
+        )
         .map { meta, reads, fastqlist ->
             [ meta, reads, fastqlist, [] ]
         }
-
+    
     emit: 
     samples = ch_prepare_somatic_fastqs_output
-
-}
-
-workflow CAT_FASTQLISTS {
-    take:
-    ch_cat_fastqlists_input  //  channel: [ id, [ path(fastqlist1), fastqlist2, ... ] ]
-
-    main:
-    ch_cat_fastqlists_output = Channel.empty()
-
-    ch_cat_fastqlists_input
-        .map { id, meta, fastqlists -> [ id, meta ] }
-        .join(
-            ch_cat_fastqlists_input
-            .map { id, meta, fastqlists ->
-                def data = fastqlists.collectMany { file -> parseFastqList(file) }
-                if (!data.isEmpty()) {
-                    def header = data[0].keySet().join(',')
-                    def content = data.collect { row ->
-                        row.values().join(',')
-                    }.join('\n')
-                    [ id, header + '\n' + content + '\n' ]
-                }
-            }
-            .collectFile(
-                { id, content -> [ "${id}.fastq_list.csv", content + '\n' ] },
-                keepHeader: true,
-                newLine: false
-            )
-            .map{ filename -> [ filename.getName().replaceAll("\\.fastq_list\\.csv", ""), filename ] }
-        )
-        .map { id, meta, fastqfile -> [ meta, fastqfile ] }
-        .set { ch_cat_fastqlists_output }
-
-    emit:
-    fastqlist = ch_cat_fastqlists_output
 
 }
 

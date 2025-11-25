@@ -2,8 +2,7 @@ process MAKE_METH_BED {
     tag "$meta.id"
     label 'process_medium'
     container "ghcr.io/dhslab/docker-baseimage:latest"
-
-    publishDir "$params.outdir/${meta.id}/", saveAs: { filename -> filename == "versions.yml" ? null : filename }, mode:'copy'
+    publishDir "$params.outdir/${meta.id}/", saveAs: { filename -> filename.equals("versions.yml") ? null : filename }, mode:'copy'
 
     input:
     tuple val(meta), path(dragen_output)

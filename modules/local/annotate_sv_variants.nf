@@ -1,8 +1,8 @@
 process ANNOTATE_SV_VARIANTS {
     tag "${meta.id}"
     label "process_medium"
-
     container "ghcr.io/dhslab/docker-vep_release113:250810"
+    publishDir "$params.outdir/${meta.id}/", saveAs: { filename -> filename.equals("versions.yml") ? null : filename }, mode:'copy'
 
     input:
     tuple val(meta), path(dragen_files, stageAs: "dragen_files/*")
@@ -28,7 +28,6 @@ process ANNOTATE_SV_VARIANTS {
 
     def bcftools_cytobands     = cytobands           ? "${cytobands.min{ it.toString().length() }}"           : ""
     """
-
     dragen_sv_file=\$(find -L dragen_files/ -type f -name "*.sv*.vcf.gz" | head -n 1)
 
     if [ -e dragen_files/*.dux4.vcf.gz ]; then
@@ -84,18 +83,10 @@ process ANNOTATE_SV_VARIANTS {
 
     bcftools concat -a vep_cnvs_out.vcf.gz vep_bnds_out.vcf.gz \\
     | bcftools sort \\
-    | bcftools annotate -a ${bcftools_sv_regions} \\
-        -c CHROM,BEG,END,-,INFO/KnownSvGenes \\
-        -H '##INFO=<ID=KnownSvGenes,Number=.,Type=String,Description="SV hotspot gene info:SYMBOL|Gene|Feature|BIOTYPE|START|END|STRAND.">' \\
-        -l KnownSvGenes:append \\
     | bcftools annotate -a ${bcftools_cytobands} \\
         -c CHROM,BEG,END,INFO/Cytobands,- \\
         -H '##INFO=<ID=Cytobands,Number=.,Type=String,Description="Cytobands">' \\
         -l Cytobands:append \\
-    | bcftools annotate -a ${bcftools_sv_ins_filter} \\
-        -c CHROM,BEG,END,INFO/SvInsertionHits,- \\
-        -i 'INFO/SVTYPE="BND"' -k \\
-        -H '##INFO=<ID=SvInsertionHits,Number=.,Type=String,Description="BND overlaps an known insertion.">' \\
         -Oz \\
         -o "${meta.id}.sv.annotated.vcf.gz"
 
@@ -122,24 +113,24 @@ process ANNOTATE_SV_VARIANTS {
     set -eo pipefail
 
     touch \\
-        "${meta.id}.sv_vep.vcf.gz" \\
-        "${meta.id}.sv_vep.vcf.gz.tbi"
+        "${meta.id}.sv.annotated.vcf.gz" \\
+        "${meta.id}.sv.annotated.vcf.gz.tbi"
 
     cat <<-END_CMDS > "${meta.id}_cmds.txt"
     dragen_sv_file=\$(find -L dragen_files/ -type f -name "*.sv*.vcf.gz" | head -n 1)
 
     if [ -e dragen_files/*.dux4.vcf.gz ]; then
         bcftools concat \\
-            -a "\${dragen_sv_file}" dragen_files/*.dux4.vcf.gz \\
+            -a "{dragen_sv_file}" dragen_files/*.dux4.vcf.gz \\
             | bcftools sort \\
                 --write-index \\
                 -Oz \\
                 -o "${meta.id}.merged.vcf.gz"
     else
-        cp \${dragen_sv_file} "${meta.id}.merged.vcf.gz"
+        cp {dragen_sv_file} "${meta.id}.merged.vcf.gz"
 
-        if [[ -f "\${dragen_sv_file}.tbi" ]]; then
-            cp \${dragen_sv_file}.tbi "${meta.id}.merged.vcf.gz.tbi"
+        if [[ -f "{dragen_sv_file}.tbi" ]]; then
+            cp {dragen_sv_file}.tbi "${meta.id}.merged.vcf.gz.tbi"
         else
             exit 1
         fi
@@ -181,18 +172,10 @@ process ANNOTATE_SV_VARIANTS {
 
     bcftools concat -a vep_cnvs_out.vcf.gz vep_bnds_out.vcf.gz \\
     | bcftools sort \\
-    | bcftools annotate -a ${bcftools_sv_regions} \\
-        -c CHROM,BEG,END,-,INFO/KnownSvGenes \\
-        -H '##INFO=<ID=KnownSvGenes,Number=.,Type=String,Description="SV hotspot gene info:SYMBOL|Gene|Feature|BIOTYPE|START|END|STRAND.">' \\
-        -l KnownSvGenes:append \\
     | bcftools annotate -a ${bcftools_cytobands} \\
         -c CHROM,BEG,END,INFO/Cytobands,- \\
         -H '##INFO=<ID=Cytobands,Number=.,Type=String,Description="Cytobands">' \\
         -l Cytobands:append \\
-    | bcftools annotate -a ${bcftools_sv_ins_filter} \\
-        -c CHROM,BEG,END,INFO/SvInsertionHits,- \\
-        -i 'INFO/SVTYPE="BND"' -k \\
-        -H '##INFO=<ID=SvInsertionHits,Number=.,Type=String,Description="BND overlaps an known insertion.">' \\
         -Oz \\
         -o "${meta.id}.sv_vep.vcf.gz"
 

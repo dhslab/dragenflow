@@ -2,6 +2,7 @@ process ANNOTATE_VARIANTS {
     tag "$meta.id"
     label 'process_low'
     container "ghcr.io/dhslab/docker-vep_release113:250810"
+    publishDir "$params.outdir/${meta.id}/", saveAs: { filename -> filename.equals("versions.yml") ? null : filename }, mode:'copy'
 
     input:
     tuple val(meta), path(dragen_files, stageAs: "dragen_files/*")

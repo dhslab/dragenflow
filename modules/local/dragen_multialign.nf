@@ -30,8 +30,11 @@ process DRAGEN_MULTIALIGN {
     path("dragen/${meta.id}_usage.txt"), emit: usage, optional: true
     path "versions.yml",    emit: versions
 
+    when:
+    params.run_dragen == true
+
     script:
-    def exe_path = "${task.ext.dragen_path}" //['dragenaws', 'awsbatch'].any{ workflow.profile.contains(it) } ? "${params.aws_dragen_path}" : "${params.local_dragen_path}"
+    def exe_path = "${task.ext.dragen_path}"
     def input = ""
     if (params.workflow == "rna" || params.workflow == "tumor"){
         input = [
@@ -51,13 +54,13 @@ process DRAGEN_MULTIALIGN {
 
     } else if (params.workflow == "somatic"){
         input = [
-            fastq_list.toString().endsWith('csv')    ? "--tumor-fastq-list ${fastq_list} --tumor-fastq-list-sample-id ${meta.tumor_id}" :
-            fastq_list.toString().endsWith('csv')    ? "--fastq-list ${fastq_list} --fastq-list-sample-id ${meta.normal_id}" :
-            error("Input file is not a BAM, CRAM, or CSV file.")
+            fastq_list.toString().endsWith('csv')    ? "--tumor-fastq-list ${fastq_list} --tumor-fastq-list-sample-id ${meta.tumor_id} --fastq-list ${fastq_list} --fastq-list-sample-id ${meta.normal_id}" :
+            error("Input file is not a CSV file.")
         ].join(' ').trim()
     }
 
     def alignment_params = [
+        task.ext.dragen_args                          ?: "",
         params.extra_dragen_args                      ?: "",
         task.ext.dragen_license_args                  ?: "",
         intermediate_directory                        ? "--intermediate-results-dir ${intermediate_directory}"                : "",
@@ -112,7 +115,7 @@ process DRAGEN_MULTIALIGN {
     """
 
     stub:
-    def exe_path = ['dragenaws', 'awsbatch'].any{ workflow.profile.contains(it) } ? "${params.aws_dragen_path}" : "${params.local_dragen_path}"
+    def exe_path = "${task.ext.dragen_path}"
     def input = ""
     if (params.workflow == "rna" || params.workflow == "tumor"){
         input = [
@@ -179,7 +182,7 @@ process DRAGEN_MULTIALIGN {
                 ${alignment_params} \\
                 ${input} \\
                 --output-directory ./dragen --force --output-file-prefix ${meta.id} > dragen/command.txt
-
+    cp ${projectDir}/assets/stub/dragen_path/* dragen/
     touch dragen/${meta.id}_usage.txt
 
     cat <<-END_VERSIONS > versions.yml
