@@ -4,10 +4,6 @@ process DRAGEN_MULTIALIGN {
     container "${task.ext.dragen_container}"
     publishDir "$params.outdir/${meta.id}/", saveAs: { filename -> filename == "versions.yml" ? null : filename.split('/')[1] }, mode:'copy'
 
-//    input:
-//    tuple val(meta), val(type), path("*")
-//    tuple val(dragen_inputs), path("*", stageAs: 'inputs/*')
-
     input:
     tuple val(meta), path(reads, stageAs: "fastq_files/*"), path(fastq_list), path(alignment_file)
     tuple val(intermediate_directory_value), path(intermediate_directory)
@@ -63,6 +59,7 @@ process DRAGEN_MULTIALIGN {
         task.ext.dragen_args                          ?: "",
         params.extra_dragen_args                      ?: "",
         task.ext.dragen_license_args                  ?: "",
+        "--enable-duplicate-marking ${params.mark_duplicates}",
         intermediate_directory                        ? "--intermediate-results-dir ${intermediate_directory}"                : "",
         intermediate_directory_value                  ? "--intermediate-results-dir ${intermediate_directory_value}"          : "",
         reference_dir                                 ? "--ref-dir ${reference_dir}"                                          : "",

@@ -88,18 +88,28 @@ def process_input(input_file: str, output_dir: str) -> None:
             "read1",
             "read2",
             "fastq_list",
+            "fastq_id",
             "cram",
-            "bam"
+            "bam",
+            "dragen_path"
     ]
 
     df = df.loc[:, [col for col in df.columns if col in valid_headers]]
 
-    # Alignment samples. Note this includes samples to demux as well as already demuxed fastqs and cram/bam for realignment.
-    alignment_cols = ["bam", "cram", "read1", "read2", "fastq_list"]
-    alignment_df = df.dropna(
-        subset=[col for col in alignment_cols if col in df], thresh=1
-    )
-    save_df(alignment_df, output_dir, "alignment_samples.csv")
+    if "dragen_path" in df.columns:
+        analysis_cols = ["id", "dragen_path"]
+        analysis_df = df.dropna(
+            subset=[col for col in analysis_cols if col in df], thresh=1
+        )
+        save_df(analysis_df, output_dir, "analysis_samples.csv")
+
+    else:
+        # Alignment samples. Note this includes samples to demux as well as already demuxed fastqs and cram/bam for realignment.
+        alignment_cols = ["bam", "cram", "read1", "read2", "fastq_list"]
+        alignment_df = df.dropna(
+            subset=[col for col in alignment_cols if col in df], thresh=1
+        )
+        save_df(alignment_df, output_dir, "alignment_samples.csv")
 
 def main() -> None:
     args = parse_arguments()
