@@ -5,7 +5,7 @@ process ANNOTATE_EXPRESSION_TABLES {
     publishDir "$params.outdir/${meta.id}/", saveAs: { filename -> filename.equals("versions.yml") ? null : filename }, mode:'copy'
 
     input:
-    tuple val(meta), path(dragen_output)
+    tuple val(meta), path(dragen_output, stageAs: "dragen_files/*")
     path(transcript_table)
 
     output:
@@ -15,8 +15,8 @@ process ANNOTATE_EXPRESSION_TABLES {
 
     script:
     """
-    add_genename_todragenrna.py -i ${meta.id}.quant.genes.sf -d ${transcript_table} -o ${meta.id}.quant.genes.annotated.tsv && \\
-    add_genename_todragenrna.py -t -i ${meta.id}.quant.sf -d ${transcript_table} -o ${meta.id}.quant.annotated.tsv
+    add_genename_todragenrna.py -i dragen_files/${meta.id}.quant.genes.sf -d ${transcript_table} -o ${meta.id}.quant.genes.annotated.tsv && \\
+    add_genename_todragenrna.py -t -i dragen_files/${meta.id}.quant.sf -d ${transcript_table} -o ${meta.id}.quant.annotated.tsv
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -31,7 +31,7 @@ process ANNOTATE_EXPRESSION_TABLES {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-    \$(cat $projectDir/assets/stub/versions/vep_version.yaml)
+        add_genename_todragenrna.py: 1.0.0
     END_VERSIONS
     """
 }

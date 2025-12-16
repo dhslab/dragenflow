@@ -122,6 +122,10 @@ ch_annotation_gtf = params.annotation_gtf
     ? Channel.fromPath(params.annotation_gtf, checkIfExists: true).collect()
     : []
 
+ch_rnaseq_transcript_table = params.transcript_table
+    ? Channel.fromPath(params.transcript_table, checkIfExists: true).collect()
+    : Channel.empty()
+
 ch_nirvana_path = params.nirvana_path && params.use_nirvana == true
     ? Channel.fromPath(params.nirvana_path, type: 'dir', checkIfExists: true).collect()
     : []
@@ -267,7 +271,7 @@ workflow DRAGENFLOW {
 
     if (params.workflow == 'rna'){
         // Annotate gene and transcript tables
-        ANNOTATE_EXPRESSION_TABLES(ch_rnaseq_dragen_output, ch_rnaseq_transcript_table)
+        ANNOTATE_EXPRESSION_TABLES(DRAGEN_MULTIALIGN.out.dragen_output, ch_rnaseq_transcript_table)
         ch_versions = ch_versions.mix(ANNOTATE_EXPRESSION_TABLES.out.versions)
     }
 
