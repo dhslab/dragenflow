@@ -1,61 +1,163 @@
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    PRINT PARAMS SUMMARY
+    IMPORT LOCAL MODULES/SUBWORKFLOWS/FUNCTIONS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { paramsSummaryLog; paramsSummaryMap } from 'plugin/nf-validation'
+include { softwareVersionsToYAML   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
+include { paramsSummaryMap         } from 'plugin/nf-schema'
+include { paramsSummaryMultiqc     } from '../subworkflows/nf-core/utils_nfcore_pipeline'
+include { methodsDescriptionText   } from '../subworkflows/local/utils_nfcore_dragenflow_pipeline'
 
-def logo = NfcoreTemplate.logo(workflow, params.monochrome_logs)
-def citation = '\n' + WorkflowMain.citation(workflow) + '\n'
-def summary_params = paramsSummaryMap(workflow)
+include { PARSE_INPUT_SAMPLESHEET     } from '../modules/local/parse_input_samplesheet'
+include { SAMPLESHEET_CHECK           } from '../modules/local/samplesheet_check.nf'
 
-// Print parameter summary log to screen
-log.info logo + paramsSummaryLog(workflow) + citation
+include { GATHER_ALIGNMENT_SAMPLES      } from '../subworkflows/local/gather_alignment_samples.nf'
+include { PREPARE_SOMATIC_FASTQS        } from '../subworkflows/local/gather_alignment_samples.nf'
+include { MAKE_HOTSPOT_VCF              } from '../modules/local/make_hotspot_vcf.nf'
+include { DRAGEN_MULTIALIGN             } from '../modules/local/dragen_multialign.nf'
+include { ANNOTATE_VARIANTS             } from '../modules/local/annotate_variants.nf'
+include { VEP_TO_TSV as VARIANTS_TO_TSV } from '../modules/local/vep_to_tsv.nf'
+include { ANNOTATE_SV_VARIANTS          } from '../modules/local/annotate_sv_variants.nf'
+include { VEP_TO_TSV as SV_TO_TSV       } from '../modules/local/vep_to_tsv.nf'
+include { ANNOTATE_CNV_VARIANTS         } from '../modules/local/annotate_cnv_variants.nf'
+include { VEP_TO_TSV as CNV_TO_TSV      } from '../modules/local/vep_to_tsv'
+include { MAKE_METH_BED                 } from '../modules/local/make_meth_bed.nf'
+include { MAKE_METH_BIGWIG              } from '../modules/local/make_meth_bigwig.nf'
+include { ANNOTATE_EXPRESSION_TABLES    } from '../modules/local/annotate_expression_tables.nf'
 
-WorkflowDragenflow.initialise(params, log)
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    CONFIG FILES
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
-ch_multiqc_config          = Channel.fromPath("$projectDir/assets/multiqc_config.yml", checkIfExists: true)
-ch_multiqc_custom_config   = params.multiqc_config ? Channel.fromPath( params.multiqc_config, checkIfExists: true ) : Channel.empty()
-ch_multiqc_logo            = params.multiqc_logo   ? Channel.fromPath( params.multiqc_logo, checkIfExists: true ) : Channel.empty()
-ch_multiqc_custom_methods_description = params.multiqc_methods_description ? file(params.multiqc_methods_description, checkIfExists: true) : file("$projectDir/assets/methods_description_template.yml", checkIfExists: true)
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    IMPORT LOCAL MODULES/SUBWORKFLOWS
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
-//
-// SUBWORKFLOWS
-//
-include { ALIGN                     } from '../subworkflows/local/align.nf'
-include { GERMLINE                  } from '../subworkflows/local/germline.nf'
-include { GATHER_FASTQS             } from '../subworkflows/local/gather_fastqs.nf'
-include { METHYLATION               } from '../subworkflows/local/methylation.nf'
-include { RNASEQ                    } from '../subworkflows/local/rna_seq.nf'
-include { SOMATIC                   } from '../subworkflows/local/somatic.nf'
-include { TUMOR                     } from '../subworkflows/local/tumor.nf'
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    IMPORT NF-CORE MODULES/SUBWORKFLOWS
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
-//
-// MODULES
-//
-include { SAMPLESHEET_CHECK         } from '../modules/local/samplesheet_check.nf'
-include { CONCATENATE_FASTQLISTS    } from '../modules/local/concatenate_fastqlists.nf'
 include { MULTIQC                     } from '../modules/nf-core/multiqc/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/custom/dumpsoftwareversions/main'
+
+
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    CREATE CHANNELS FOR INPUT PARAMETERS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+// DRAGEN reference directory
+ch_reference_dir = params.refdir
+    ? Channel.fromPath(params.refdir, type: 'dir', checkIfExists: true).collect()
+    : Channel.empty()
+
+ch_dbsnp = params.dbsnp
+    ? Channel.fromPath(params.dbsnp, checkIfExists: true).collect()
+    : []
+
+// DRAGEN adapter sequences for read 1
+ch_adapter1_file = params.adapter1
+    ? Channel.fromPath(params.adapter1, checkIfExists: true).collect()
+    : []
+
+// DRAGEN adapter sequences for read 2
+ch_adapter2_file = params.adapter2
+    ? Channel.fromPath(params.adapter2, checkIfExists: true).collect()
+    : []
+
+// DRAGEN intermediate directory
+if (params.intermediate_dir?.toString()?.startsWith('/staging')) {
+    ch_intermediate_dir = Channel.of(params.intermediate_dir).map{ [ it, [] ] }.collect()
+} else if (params.intermediate_dir) {
+    ch_intermediate_dir = Channel.fromPath(params.intermediate_dir).map{ [ [], it ] }.collect()
+} else {
+    ch_intermediate_dir = [ [], [] ]
+}
+
+// DRAGEN hotspots
+ch_hotspot_vcf = params.hotspot_vcf
+    ? Channel.fromPath("${params.hotspot_vcf}*", checkIfExists: true).collect()
+    : Channel.empty()
+
+ch_hotspot_bed = params.hotspot_bed
+    ? Channel.fromPath(params.hotspot_bed, checkIfExists: true).collect()
+    : Channel.empty()
+
+// DRAGEN tandem duplications
+ch_dragen_tandem_dup_hotspots = params.dragen_tandem_dup_hotspots
+    ? Channel.fromPath(params.dragen_tandem_dup_hotspots, checkIfExists: true).collect()
+    : []
+
+// SNV systematic noise BED file
+ch_snv_noisefile = params.snv_noisefile
+    ? Channel.fromPath(params.snv_noisefile, checkIfExists: true).collect()
+    : []
+
+// SV systematic noise BED file
+ch_sv_noisefile = params.sv_noisefile
+    ? Channel.fromPath(params.sv_noisefile, checkIfExists: true).collect()
+    : []
+
+// High confidence CNV VCF file
+ch_cnv_population_vcf = params.cnv_population_vcf
+    ? Channel.fromPath(params.cnv_population_vcf, checkIfExists: true).collect()
+    : []
+
+// CRAM reference file
+ch_cram_reference = params.cram_reference
+    ? Channel.fromPath("${params.cram_reference}*", checkIfExists: true).collect()
+    : []
+
+// Target bed file
+ch_target_bed = params.target_bedfile
+    ? Channel.fromPath(params.target_bedfile, checkIfExists: true).collect()
+    : []
+
+// FastA reference
+ch_fasta_reference = params.fasta
+    ? Channel.fromPath("${params.fasta}*", checkIfExists: true).collect()
+    : Channel.empty()
+
+// Vep cache
+ch_vepcache = params.vepcache
+    ? Channel.fromPath(params.vepcache, type: 'dir', checkIfExists: true).collect()
+    : Channel.empty()
+
+// Cytobands
+ch_cytobands = params.cytobands
+    ? Channel.fromPath("${params.cytobands}*", checkIfExists: true).collect()
+    : []
+
+ch_annotation_gtf = params.annotation_gtf
+    ? Channel.fromPath(params.annotation_gtf, checkIfExists: true).collect()
+    : []
+
+ch_rnaseq_transcript_table = params.transcript_table
+    ? Channel.fromPath(params.transcript_table, checkIfExists: true).collect()
+    : Channel.empty()
+
+ch_nirvana_path = params.nirvana_path && params.use_nirvana == true
+    ? Channel.fromPath(params.nirvana_path, type: 'dir', checkIfExists: true).collect()
+    : []
+
+// Indicator channel to run dragen
+ch_run_dragen = params.run_dragen
+    ? Channel.value(params.run_dragen)
+    : Channel.empty()
+
+/*
+~~~~~~~~~~~~~~~~~~
+MultiQC parameters
+~~~~~~~~~~~~~~~~~~
+*/
+
+// Config
+ch_multiqc_config = Channel.fromPath("${projectDir}/assets/multiqc_config.yml", checkIfExists: true)
+
+// Custom config
+ch_multiqc_custom_config = params.multiqc_config
+    ? Channel.fromPath(params.multiqc_config, checkIfExists: true)
+    : Channel.empty()
+
+// Logo
+ch_multiqc_logo = params.multiqc_logo
+    ? Channel.fromPath(params.multiqc_logo, checkIfExists: true)
+    : Channel.empty()
+
+// Methods description
+ch_multiqc_custom_methods_description = params.multiqc_methods_description
+    ? file(params.multiqc_methods_description, checkIfExists: true)
+    : file("${projectDir}/assets/methods_description_template.yml", checkIfExists: true)
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -63,278 +165,128 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/custom/dumpsoft
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-// This function 'stages' a set of files defined by a map of key:filepath pairs.
-// It returns a tuple: a map of key:filename pairs and list of file paths.
-// This can be used to generate a value Channel that can be used as input to a process
-// that accepts a tuple val(map), path("*") so map.key refers to the appropriate linked file.
-def stageFileset(Map filePathMap) {
-    def basePathMap = [:]
-    def filePathsList = []
-
-    filePathMap.each { key, value ->
-        if (value != null) {
-            def filepath = file(value)
-            if (filepath.exists()) {
-                // Add basename and key to the map
-                basePathMap[key] = value.split('/')[-1]
-                // Add file path to the list
-                filePathsList << filepath
-            } else {
-                println "Warning: File at '${value}' for key '${key}' does not exist."
-            }
-        }
-    }
-    return [basePathMap, filePathsList]
+def generateMetaFromCsv(csv_file) {
+    def lines = csv_file.text.readLines()
+    def headers = lines[0].split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)*.replaceAll(/^"|"$/, '')
+    return lines.drop(1).collect { line ->
+        def fields = line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)*.replaceAll(/^"|"$/, '')
+        [headers, fields].transpose().collectEntries { k, v -> v ? [(k): v] : [:] }
+    }.findAll { it }
 }
-
-def create_samplesheet(LinkedHashMap row) {
-    // create meta map
-    def meta = [:]
-
-    meta.id             = row.id ?: null
-    meta.assay          = row.assay ?: null
-    meta.uid            = row.uid ?: null  
-    meta.sample_type    = row.sample_type ?: null
-    meta.sample_id      = row.sample_id ?: null
-    meta.sex            = row.sex ?: null
-
-    def obj = [:]
-
-    obj.indexes = row.lane && row.i7index && row.i5index ? [ lane:row.lane, i7index:row.i7index, i5index:row.i5index ] : null
-    obj.fastq_list = row.fastq_list ? row.fastq_list : null
-    obj.demux_path = row.demux_path ? row.demux_path : null
-    obj.reads = row.read1 && row.read2 ? [ read1:row.read1, read2:row.read2 ] : null
-    obj.cram = row.cram ? row.cram : null
-    obj.dragen_path = row.dragen_path ? row.dragen_path : null
-
-    return [ meta, obj ] //indexes, fastq_list, demux_path, reads, cram, dragen_path ]
-}
-
-// Function to merge multiple LinkedHashMaps into lists by key using the '<<' operator
-LinkedHashMap merge_maps(List<LinkedHashMap> maps) {
-    LinkedHashMap result = new LinkedHashMap()
-    def count = 0
-    maps.each { map ->
-        map.each { key, value ->
-            if (value != null){        
-                if (result.containsKey(key) && result[key] != null) {
-                    result[key] << value
-                } else {
-                    result[key] = [value]
-                    count++
-                }
-            }
-        }
-    }
-    result['count'] = count
-    return result
-}
-
-def parseCSV(filePath) {
-    List<Map<String, String>> data = []
-
-    // Read the file and split each line
-    filePath.withReader { reader ->
-        // Read the header line to use as keys for the map
-        def headers = reader.readLine().split(',')
-
-        // Process each subsequent line
-        reader.splitEachLine(',') { values ->
-            def row = [:]
-            headers.eachWithIndex { header, i ->
-                row[header.trim()] = values[i].trim()
-            }
-            data.add(row)
-        }
-    }
-
-    return data
-}
-
-// If MGI samplesheet is used, we need to set the 
-// data path because only files are given. This sets the 
-// data path to the samplesheet directory, or the data_path parameter.
-def data_path = ""
-if (params.mgi == true) {
-    data_path = new File(params.input).parentFile.absolutePath
-} else if (params.data_path != null){
-    data_path  = params.data_path
-}
-
-// Info required for completion email and summary
-def multiqc_report = []
 
 workflow DRAGENFLOW {
 
-    ch_versions     = Channel.empty()
-    ch_mastersheet  = Channel.empty()
-    ch_input_data   = Channel.empty()
+    take:
+    ch_input_samplesheet  // channel: [ path(file) ]
 
-    // Parse mastersheet and get meta hash and inputs.
-   SAMPLESHEET_CHECK(Channel.fromPath(params.input), data_path)
-   ch_versions = ch_versions.mix(SAMPLESHEET_CHECK.out.versions)
-
-    SAMPLESHEET_CHECK.out.csv
-    .splitCsv ( header:true, sep:',', quote:'"' )
-    .map { create_samplesheet(it) }
-    .groupTuple()
-    .map { meta, inputs -> 
-        def new_inputs = merge_maps(inputs)
-        meta.count = new_inputs.count
-        [ meta, new_inputs ] 
-    }
-    .branch {
-        crams: it[0].count == 1 && it[1].cram != null && params.workflow != 'somatic'
-        fastqs: it[1].cram == null || params.workflow == 'somatic'
-        other: true
-    }.set { ch_mastersheet }
-
-    // get crams. first branch on whether there are multiple crams or a single one.
-    // for now do not handle multiple crams.
-    ch_mastersheet.crams
-    .branch { 
-        single: it[1].cram.size() == 1
-        multiple: it[1].cram.size() > 1
-    }.set { ch_aligned_crams }    
-
-    ch_aligned_crams.single
-    .map { meta, inputs -> 
-        def new_meta = meta.subMap('id', 'uid','sex','sample_type','sample_id','assay')
-        if (inputs.cram[0].split('\\.')[-1] == 'cram') {
-            new_meta.cram = file(inputs.cram[0]).getName()
-            return [ new_meta, 'cram', [ file(inputs.cram[0]), file(inputs.cram[0] + '.crai', checkIfExists: true)  ] ]
-        } else if (inputs.cram[0].split('\\.')[-1] == 'bam') {
-            new_meta.bam = file(inputs.cram[0]).getName()
-            return [ new_meta, 'bam', [ file(inputs.cram[0]), file(inputs.cram[0] + '.bai', checkIfExists: true)  ] ]
-        }
-    }
-    .mix(ch_input_data)
-    .set { ch_input_data }
+    main:
+    ch_versions          = Channel.empty()
+    ch_dragen_usage      = Channel.empty()
+    ch_demux_output      = Channel.empty()
+    ch_alignment_samples = Channel.empty() // channel: [ val(meta), path(reads), path(fastq_list), path(alignment_files) ]
     
-    // ch_mastersheet.fastqs.dump(pretty: true)
-
     //
-    // get fastqs
+    // MODULE: Parse input samplesheet to get sample meta for demux, align, and analysis samples. 
+    //         Output of this process is 3 csv files, one for each entry point.
     //
-    GATHER_FASTQS(ch_mastersheet.fastqs)
-    ch_versions = ch_versions.mix(GATHER_FASTQS.out.versions)
+    PARSE_INPUT_SAMPLESHEET (
+        ch_input_samplesheet
+    )
+    ch_versions = ch_versions.mix(PARSE_INPUT_SAMPLESHEET.out.versions)
 
-    GATHER_FASTQS.out.fastqs
-    .map { meta, fqlist -> 
-        def key = groupKey(meta, meta.count)
-        [ key, fqlist ]
-    }
-    .groupTuple() | CONCATENATE_FASTQLISTS // this is done with a process because otherwise it could wait for the group to fill
-   
-    // this takes the fastq_list files and the fastq fof and 
-    // combines them
-    CONCATENATE_FASTQLISTS.out.fastqs
-    .map { meta, fastqlist, fastqs ->
-        def files = [fastqlist]
-        def lines = new File(fastqs.toString()).readLines()
-        lines.each { line ->
-            files.add(file(line))
-        }
-        [ meta, 'fastq', files ]
-    }
-    .mix(ch_input_data)
-    .set { ch_input_data }
+    GATHER_ALIGNMENT_SAMPLES (
+        PARSE_INPUT_SAMPLESHEET.out.samples_to_align,
+        ch_demux_output.ifEmpty([]),
+        ch_cram_reference
+    )
+    ch_versions          = ch_versions.mix(GATHER_ALIGNMENT_SAMPLES.out.versions)
+    ch_alignment_samples = ch_alignment_samples.mix(GATHER_ALIGNMENT_SAMPLES.out.samples)
 
-    // ch_input_data.dump(pretty: true)
+    MAKE_HOTSPOT_VCF(
+        ch_hotspot_bed,
+        ch_fasta_reference
+    )
+    ch_versions = ch_versions.mix(MAKE_HOTSPOT_VCF.out.versions)
+    ch_hotspot_vcf = MAKE_HOTSPOT_VCF.out.hotspot_vcf
 
     if (params.workflow == 'somatic') {
-
         // for somatic workflow, need to assemble tumor and normal data
-        // note that for the somatic workflow, the input type is only fastq
-        ch_somatic_input = Channel.empty()
+        PREPARE_SOMATIC_FASTQS(ch_alignment_samples)
+        ch_alignment_samples = PREPARE_SOMATIC_FASTQS.out.samples
+    }
 
-        ch_input_data
-        .map { meta, type, files -> 
-            def new_meta = [:]
-            new_meta['id'] = meta.uid
-            new_meta['assay'] = meta.assay
-            def tumor_id = ""
-            def normal_id = ""
-            if (meta.sample_type == 'tumor'){
-                tumor_id = meta.id
-            } else if (meta.sample_type == 'normal'){
-                normal_id = meta.id
-            }
-            [ new_meta, tumor_id, normal_id, files ]
-        }
-        .groupTuple(by:0)
-        .filter { it[1].findAll { it != '' }.unique().size() == 1 && it[2].findAll { it != '' }.unique().size() == 1 }
-        .map { meta, tumor, normal, files -> 
-                new_meta = meta.subMap('id', 'assay')
-                new_meta['tumor'] = tumor.findAll { it != '' }.unique()[0]
-                new_meta['normal'] = normal.findAll { it != '' }.unique()[0]
-
-                return [ new_meta, "fastq", files.flatten() ]
-        }
-        .filter { it[0].tumor != "" && it[0].normal != "" }
-        .set { ch_somatic_input }
-            
-        params.dragen_inputs.methylation_reference = null
-        if (params.target_bed_file != null){
-            params.dragen_inputs.target_bed_file = params.target_bed_file
-        }
-        if (params.hotspot_vcf != null){
-            params.dragen_inputs.hotspot_vcf = params.hotspot_vcf
-            params.dragen_inputs.hotspot_vcf_index = params.hotspot_vcf_index
-        }
-
-        ch_dragen_inputs = Channel.value(stageFileset(params.dragen_inputs))
-
-        SOMATIC(ch_somatic_input, ch_dragen_inputs)
-        ch_versions = ch_versions.mix(SOMATIC.out.versions)
+    ch_alignment_samples.dump(tag:'alignment_samples',pretty:true)
+  
+    DRAGEN_MULTIALIGN (
+        ch_alignment_samples,
+        ch_intermediate_dir,
+        ch_reference_dir,
+        ch_dbsnp,
+        ch_adapter1_file,
+        ch_adapter2_file,
+        ch_cram_reference,
+        ch_sv_noisefile,
+        ch_snv_noisefile,
+        ch_hotspot_vcf.ifEmpty([]),
+        ch_cnv_population_vcf,
+        ch_dragen_tandem_dup_hotspots,
+        ch_target_bed,
+        ch_annotation_gtf,
+        ch_nirvana_path
+    )
+    ch_versions     = ch_versions.mix(DRAGEN_MULTIALIGN.out.versions)
+    ch_dragen_usage = ch_dragen_usage.mix(DRAGEN_MULTIALIGN.out.usage)
     
-    } else {
+    ANNOTATE_VARIANTS (
+        DRAGEN_MULTIALIGN.out.dragen_output,
+        ch_fasta_reference,
+        ch_vepcache
+    )
+    ch_versions = ch_versions.mix(ANNOTATE_VARIANTS.out.versions)
 
-        if (params.workflow == '5mc') {
+    VARIANTS_TO_TSV (ANNOTATE_VARIANTS.out.vcf,Channel.value('vcf'))
+    ch_versions = ch_versions.mix(VARIANTS_TO_TSV.out.versions)
 
-            // Stage Dragen input files
-            params.dragen_inputs.reference = params.dragen_inputs.methylation_reference
-            params.dragen_inputs.methylation_reference = null
-            ch_dragen_inputs = Channel.value(stageFileset(params.dragen_inputs))
+    ANNOTATE_SV_VARIANTS (
+        DRAGEN_MULTIALIGN.out.dragen_output,
+        ch_fasta_reference,
+        ch_vepcache,
+        ch_cytobands
+    )
+    ch_versions = ch_versions.mix(ANNOTATE_VARIANTS.out.versions)
 
-            METHYLATION(ch_input_data, ch_dragen_inputs)
-            ch_versions = ch_versions.mix(METHYLATION.out.versions)
+    SV_TO_TSV (ANNOTATE_SV_VARIANTS.out.vcf,Channel.value('sv'))
+    ch_versions = ch_versions.mix(SV_TO_TSV.out.versions)
 
-        } else {
+    ANNOTATE_CNV_VARIANTS (
+        DRAGEN_MULTIALIGN.out.dragen_output,
+        ch_fasta_reference,
+        ch_vepcache,
+        ch_cytobands
+    )
+    ch_versions = ch_versions.mix(ANNOTATE_CNV_VARIANTS.out.versions)
 
-            params.dragen_inputs.methylation_reference = null
-            if (params.target_bed_file != null){
-                params.dragen_inputs.target_bed_file = params.target_bed_file
-            }
-            if (params.hotspot_vcf != null){
-                params.dragen_inputs.hotspot_vcf = params.hotspot_vcf
-                params.dragen_inputs.hotspot_vcf_index = params.hotspot_vcf_index
-            }
+    CNV_TO_TSV (ANNOTATE_CNV_VARIANTS.out.vcf,Channel.value('cnv'))
+    ch_versions = ch_versions.mix(CNV_TO_TSV.out.versions)
 
-            ch_dragen_inputs = Channel.value(stageFileset(params.dragen_inputs))
+    if (params.workflow == 'rna'){
+        // Annotate gene and transcript tables
+        ANNOTATE_EXPRESSION_TABLES(DRAGEN_MULTIALIGN.out.dragen_output, ch_rnaseq_transcript_table)
+        ch_versions = ch_versions.mix(ANNOTATE_EXPRESSION_TABLES.out.versions)
+    }
 
-            if (params.workflow == 'rna') {
-                RNASEQ(ch_input_data, ch_dragen_inputs)
-                ch_versions = ch_versions.mix(RNASEQ.out.versions)
-            }
+    if (params.workflow == 'bsseq'){
+        // Need to add a process to convert dragen methylation output to a bed file.
+        MAKE_METH_BED (
+            DRAGEN_MULTIALIGN.out.dragen_output
+        )
+        ch_versions = ch_versions.mix(MAKE_METH_BED.out.versions)
 
-            if (params.workflow == 'tumor') {
-                ch_input_data.view()
-                TUMOR(ch_input_data, ch_dragen_inputs)
-                ch_versions = ch_versions.mix(TUMOR.out.versions)
-            }
-
-            if (params.workflow == 'align' || (params.workflow == 'idtumis' && params.target_bed_file != null)) {
-                ALIGN(ch_input_data, ch_dragen_inputs)
-                ch_versions = ch_versions.mix(ALIGN.out.versions)
-            }
-
-            if (params.workflow == 'germline'){ 
-                GERMLINE(ch_input_data, ch_dragen_inputs)
-                ch_versions = ch_versions.mix(GERMLINE.out.versions)
-            }
-
-        }
+        MAKE_METH_BIGWIG (
+            DRAGEN_MULTIALIGN.out.dragen_output,
+            ch_fasta_reference
+        )
+        ch_versions = ch_versions.mix(MAKE_METH_BIGWIG.out.versions)
     }
 
     CUSTOM_DUMPSOFTWAREVERSIONS (
@@ -342,43 +294,44 @@ workflow DRAGENFLOW {
     )
 
     //
+    // Collate and save software versions
+    //
+    softwareVersionsToYAML(ch_versions)
+        .collectFile(
+            storeDir: "${params.outdir}/pipeline_info",
+            name    : 'software_versions.yml',
+            sort    : true,
+            newLine : true
+        )
+        .set{ ch_collated_versions }
+        
+    //
     // MODULE: MultiQC
     //
-    workflow_summary    = WorkflowDragenflow.paramsSummaryMultiqc(workflow, summary_params)
-    ch_workflow_summary = Channel.value(workflow_summary)
+    summary_params      = paramsSummaryMap(workflow, parameters_schema: "nextflow_schema.json")
+    ch_workflow_summary = Channel.value(paramsSummaryMultiqc(summary_params))
 
-    methods_description    = WorkflowDragenflow.methodsDescriptionText(workflow, ch_multiqc_custom_methods_description, params)
-    ch_methods_description = Channel.value(methods_description)
+    ch_methods_description = Channel.value(methodsDescriptionText(ch_multiqc_custom_methods_description))
 
-    ch_multiqc_files = Channel.empty()
-    ch_multiqc_files = ch_multiqc_files.mix(ch_workflow_summary.collectFile(name: 'workflow_summary_mqc.yaml'))
-    ch_multiqc_files = ch_multiqc_files.mix(ch_methods_description.collectFile(name: 'methods_description_mqc.yaml'))
-    ch_multiqc_files = ch_multiqc_files.mix(CUSTOM_DUMPSOFTWAREVERSIONS.out.mqc_yml.collect())
+    ch_multiqc_files = ch_collated_versions
+                        .mix(
+                            ch_workflow_summary.collectFile(name: 'workflow_summary_mqc.yaml'),
+                            ch_methods_description.collectFile(name: 'methods_description_mqc.yaml', sort: true)
+                        )
 
-    MULTIQC (
+    MULTIQC(
         ch_multiqc_files.collect(),
         ch_multiqc_config.toList(),
         ch_multiqc_custom_config.toList(),
-        ch_multiqc_logo.toList()
+        ch_multiqc_logo.toList(),
+        [],
+        []
     )
-    multiqc_report = MULTIQC.out.report.toList()
-}
 
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    COMPLETION EMAIL AND SUMMARY
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
+    emit:
+    multiqc_report = MULTIQC.out.report.toList()  // channel: [ path(file) ]
+    versions       = ch_versions                  // channel: [ path(file) ]
 
-workflow.onComplete {
-    if (params.email || params.email_on_fail) {
-        NfcoreTemplate.email(workflow, params, summary_params, projectDir, log, multiqc_report)
-    }
-    NfcoreTemplate.dump_parameters(workflow, params)
-    NfcoreTemplate.summary(workflow, params, log)
-    if (params.hook_url) {
-        NfcoreTemplate.IM_notification(workflow, params, summary_params, projectDir, log)
-    }
 }
 
 /*

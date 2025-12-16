@@ -7,7 +7,7 @@ process ANNOTATE_RNASEQ {
 
     input:
     tuple val(meta), path(dragen_output)
-    tuple val(dragen_inputs), path("*", stageAs: 'inputs/*')
+    path(transcript_table)
 
     output:
     tuple val(meta), path("${meta.id}.quant.genes.annotated.tsv"), emit: genes
@@ -16,8 +16,8 @@ process ANNOTATE_RNASEQ {
 
     script:
     """
-    add_genename_todragenrna.py -i ${meta.id}.quant.genes.sf -d inputs/${dragen_inputs.transcript_table} -o ${meta.id}.quant.genes.annotated.tsv && \\
-    add_genename_todragenrna.py -t -i ${meta.id}.quant.sf -d inputs/${dragen_inputs.transcript_table} -o ${meta.id}.quant.annotated.tsv
+    add_genename_todragenrna.py -i ${meta.id}.quant.genes.sf -d ${transcript_table} -o ${meta.id}.quant.genes.annotated.tsv && \\
+    add_genename_todragenrna.py -t -i ${meta.id}.quant.sf -d ${transcript_table} -o ${meta.id}.quant.annotated.tsv
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
