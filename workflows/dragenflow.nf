@@ -43,17 +43,17 @@ ch_reference_dir = params.refdir
 
 ch_dbsnp = params.dbsnp
     ? Channel.fromPath(params.dbsnp, checkIfExists: true).collect()
-    : []
+    : Channel.value([])
 
 // DRAGEN adapter sequences for read 1
 ch_adapter1_file = params.adapter1
     ? Channel.fromPath(params.adapter1, checkIfExists: true).collect()
-    : []
+    : Channel.value([])
 
 // DRAGEN adapter sequences for read 2
 ch_adapter2_file = params.adapter2
     ? Channel.fromPath(params.adapter2, checkIfExists: true).collect()
-    : []
+    : Channel.value([])
 
 // DRAGEN intermediate directory
 if (params.intermediate_dir?.toString()?.startsWith('/staging')) {
@@ -67,7 +67,7 @@ if (params.intermediate_dir?.toString()?.startsWith('/staging')) {
 // DRAGEN hotspots
 ch_hotspot_vcf = params.hotspot_vcf
     ? Channel.fromPath("${params.hotspot_vcf}*", checkIfExists: true).collect()
-    : Channel.empty()
+    : Channel.value([])
 
 ch_hotspot_bed = params.hotspot_bed
     ? Channel.fromPath(params.hotspot_bed, checkIfExists: true).collect()
@@ -76,32 +76,32 @@ ch_hotspot_bed = params.hotspot_bed
 // DRAGEN tandem duplications
 ch_dragen_tandem_dup_hotspots = params.dragen_tandem_dup_hotspots
     ? Channel.fromPath(params.dragen_tandem_dup_hotspots, checkIfExists: true).collect()
-    : []
+    : Channel.value([])
 
 // SNV systematic noise BED file
 ch_snv_noisefile = params.snv_noisefile
     ? Channel.fromPath(params.snv_noisefile, checkIfExists: true).collect()
-    : []
+    : Channel.value([])
 
 // SV systematic noise BED file
 ch_sv_noisefile = params.sv_noisefile
     ? Channel.fromPath(params.sv_noisefile, checkIfExists: true).collect()
-    : []
+    : Channel.value([])
 
 // High confidence CNV VCF file
 ch_cnv_population_vcf = params.cnv_population_vcf
     ? Channel.fromPath(params.cnv_population_vcf, checkIfExists: true).collect()
-    : []
+    : Channel.value([])
 
 // CRAM reference file
 ch_cram_reference = params.cram_reference
     ? Channel.fromPath("${params.cram_reference}*", checkIfExists: true).collect()
-    : []
+    : Channel.value([])
 
 // Target bed file
 ch_target_bed = params.target_bedfile
     ? Channel.fromPath(params.target_bedfile, checkIfExists: true).collect()
-    : []
+    : Channel.value([])
 
 // FastA reference
 ch_fasta_reference = params.fasta
@@ -116,11 +116,11 @@ ch_vepcache = params.vepcache
 // Cytobands
 ch_cytobands = params.cytobands
     ? Channel.fromPath("${params.cytobands}*", checkIfExists: true).collect()
-    : []
+    : Channel.value([])
 
 ch_annotation_gtf = params.annotation_gtf
     ? Channel.fromPath(params.annotation_gtf, checkIfExists: true).collect()
-    : []
+    : Channel.value([])
 
 ch_rnaseq_transcript_table = params.transcript_table
     ? Channel.fromPath(params.transcript_table, checkIfExists: true).collect()
@@ -128,7 +128,7 @@ ch_rnaseq_transcript_table = params.transcript_table
 
 ch_nirvana_path = params.nirvana_path && params.use_nirvana == true
     ? Channel.fromPath(params.nirvana_path, type: 'dir', checkIfExists: true).collect()
-    : []
+    : Channel.value([])
 
 // Indicator channel to run dragen
 ch_run_dragen = params.run_dragen
@@ -184,6 +184,7 @@ workflow DRAGENFLOW {
     ch_dragen_usage      = Channel.empty()
     ch_demux_output      = Channel.empty()
     ch_alignment_samples = Channel.empty() // channel: [ val(meta), path(reads), path(fastq_list), path(alignment_files) ]
+    ch_dragen_output     = Channel.empty()
     
     //
     // MODULE: Parse input samplesheet to get sample meta for demux, align, and analysis samples. 
@@ -207,16 +208,16 @@ workflow DRAGENFLOW {
         ch_fasta_reference
     )
     ch_versions = ch_versions.mix(MAKE_HOTSPOT_VCF.out.versions)
-    ch_hotspot_vcf = MAKE_HOTSPOT_VCF.out.hotspot_vcf
-
+    ch_hotspot_vcf = MAKE_HOTSPOT_VCF.out.hotspot_vcf.collect().ifEmpty([])
+    
     if (params.workflow == 'somatic') {
         // for somatic workflow, need to assemble tumor and normal data
         PREPARE_SOMATIC_FASTQS(ch_alignment_samples)
         ch_alignment_samples = PREPARE_SOMATIC_FASTQS.out.samples
     }
 
-    ch_alignment_samples.dump(tag:'alignment_samples',pretty:true)
-  
+    //ch_alignment_samples.dump(tag:'alignment_samples',pretty:true)
+
     DRAGEN_MULTIALIGN (
         ch_alignment_samples,
         ch_intermediate_dir,
@@ -227,18 +228,27 @@ workflow DRAGENFLOW {
         ch_cram_reference,
         ch_sv_noisefile,
         ch_snv_noisefile,
-        ch_hotspot_vcf.ifEmpty([]),
+        ch_hotspot_vcf,
         ch_cnv_population_vcf,
         ch_dragen_tandem_dup_hotspots,
         ch_target_bed,
         ch_annotation_gtf,
         ch_nirvana_path
     )
+    ch_dragen_output = ch_dragen_output.mix(DRAGEN_MULTIALIGN.out.dragen_output)
     ch_versions     = ch_versions.mix(DRAGEN_MULTIALIGN.out.versions)
     ch_dragen_usage = ch_dragen_usage.mix(DRAGEN_MULTIALIGN.out.usage)
-    
+
     ANNOTATE_VARIANTS (
-        DRAGEN_MULTIALIGN.out.dragen_output,
+        ch_dragen_output.map{ meta, files -> 
+            def vcf = files.findAll { it.name =~ /\.hard-filtered\.vcf\.gz(\.tbi)?$/ }
+            if (vcf){
+                [ meta, vcf ]
+            } else {
+                []
+            }
+        }
+        .filter{it!=[]},
         ch_fasta_reference,
         ch_vepcache
     )
@@ -248,7 +258,15 @@ workflow DRAGENFLOW {
     ch_versions = ch_versions.mix(VARIANTS_TO_TSV.out.versions)
 
     ANNOTATE_SV_VARIANTS (
-        DRAGEN_MULTIALIGN.out.dragen_output,
+        ch_dragen_output.map{ meta, files -> 
+            def vcf = files.findAll { it.name =~ /\.sv\.vcf\.gz(\.tbi)?$/ }
+            if (vcf){
+                [ meta, vcf ]
+            } else {
+                []
+            }
+        }
+        .filter{it!=[]},
         ch_fasta_reference,
         ch_vepcache,
         ch_cytobands
@@ -259,7 +277,15 @@ workflow DRAGENFLOW {
     ch_versions = ch_versions.mix(SV_TO_TSV.out.versions)
 
     ANNOTATE_CNV_VARIANTS (
-        DRAGEN_MULTIALIGN.out.dragen_output,
+        ch_dragen_output.map{ meta, files -> 
+            def vcf = files.findAll { it.name =~ /\.cnv\.vcf\.gz(\.tbi)?$/ }
+            if (vcf){
+                [ meta, vcf ]
+            } else {
+                []
+            }
+        }
+        .filter{it!=[]},
         ch_fasta_reference,
         ch_vepcache,
         ch_cytobands
@@ -271,7 +297,18 @@ workflow DRAGENFLOW {
 
     if (params.workflow == 'rna'){
         // Annotate gene and transcript tables
-        ANNOTATE_EXPRESSION_TABLES(DRAGEN_MULTIALIGN.out.dragen_output, ch_rnaseq_transcript_table)
+        ANNOTATE_EXPRESSION_TABLES(
+            ch_dragen_output.map{ meta, files -> 
+                def vcf = files.findAll { it.name =~ /\.quant\.genes\.sf$|\.quant\.sf$/ }
+                if (vcf){
+                    [ meta, vcf ]
+                } else {
+                    []
+                }
+            }
+            .filter{it!=[]},
+            ch_rnaseq_transcript_table
+        )
         ch_versions = ch_versions.mix(ANNOTATE_EXPRESSION_TABLES.out.versions)
     }
 
