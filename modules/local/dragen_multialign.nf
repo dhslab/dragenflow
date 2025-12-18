@@ -68,6 +68,7 @@ process DRAGEN_MULTIALIGN {
         params.alignment_file_format                  ? "--output-format ${params.alignment_file_format}"                     : "",
         meta.sex?.toLowerCase() in ['male', 'female'] ? "--sample-sex ${meta.sex}"                                            : "",
         adapter1 && adapter2                          ? "--read-trimmers adapter --trim-adapter-read1 ${adapter1} --trim-adapter-read2 ${adapter2}" : "",
+        annotation_gtf                                ? "-a ${annotation_gtf}"                                                : "",
         params.umi                                    ? "--umi-enable true --umi-library-type=${params.umi}"                  : "",
         params.umi && params.readfamilysize           ? "--umi-min-supporting-reads ${readfamilysize}"                        : "",
         params.umi && target_bed                      ? "--umi-metrics-interval-file ${target_bed}"                           : "",

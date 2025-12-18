@@ -226,8 +226,6 @@ workflow GATHER_ALIGNMENT_SAMPLES {
             .map{ meta, reads, fastq_list -> [ meta, reads.flatten(), fastq_list ] }
         )
 
-    ch_gathered_samples.dump(tag:'gathered_samples', pretty:true)
-
     //
     emit:
     samples  = ch_gathered_samples.map { meta, reads, fastq_list -> [ meta, reads, fastq_list, [] ] }  // channel: [ val(meta), path(reads), path(fastq_list), path(alignment_file) ]
