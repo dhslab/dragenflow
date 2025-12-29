@@ -165,7 +165,8 @@ process DRAGEN_MULTIALIGN {
         params.cnv_caller && params.dragen_cnv_merge_distance              ? "--cnv-merge-distance ${params.dragen_cnv_merge_distance}"            : "",
         tandem_duplications                           ? "--sv-somatic-ins-tandup-hotspot-regions-bed ${tandem_duplications}"  : "",
         params.use_nirvana && nirvana_path ? "--enable-variant-annotation true --variant-annotation-assembly ${params.nirvana_assembly} --variant-annotation-data ${nirvana_path}" : "",
-        params.use_nirvana && nirvana_path ? "--vc-enable-germline-tagging true" : "--vc-skip-germline-tagging true"
+        params.use_nirvana && nirvana_path ? "--vc-enable-germline-tagging true" : "--vc-skip-germline-tagging true",
+        !params.pangenome_reference ? "--validate-pangenome-reference=false" : ""
     ].join(' ').trim()
 
     """
