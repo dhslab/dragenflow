@@ -6,6 +6,7 @@
 
 include { PARTITION_ALIGNMENT_FILE         } from '../../modules/local/partition_alignment_file'
 include { CONVERT_ALIGNMENT_FILE_TO_FASTQ  } from '../../modules/local/convert_alignment_file_to_fastq'
+include { TRIM_ADAPTERS                    } from '../../modules/local/trim_adapters.nf'
 include { CREATE_FASTQ_LIST                } from '../../modules/local/create_fastq_list'
 
 
@@ -30,6 +31,16 @@ def parseFastqList(file) {
     }
 }
 
+// DRAGEN adapter sequences for read 1
+ch_adapter1_file = params.adapter1
+    ? Channel.fromPath(params.adapter1, checkIfExists: true).collect()
+    : Channel.value([])
+
+// DRAGEN adapter sequences for read 2
+ch_adapter2_file = params.adapter2
+    ? Channel.fromPath(params.adapter2, checkIfExists: true).collect()
+    : Channel.value([])
+
 /*
 ========================================================================================
     SUBWORKFLOW TO GATHER ALIGNMENT SAMPLES
@@ -46,6 +57,7 @@ workflow GATHER_ALIGNMENT_SAMPLES {
     main:
     ch_versions          = Channel.empty()
     ch_gathered_fastqs   = Channel.empty() // channel: [ val(meta), path(read1), path(read2), path(runinfo.xml) ]
+    ch_fastqs            = Channel.empty() // channel: [ val(meta), path(read1), path(read2), path(runinfo.xml) ]
 
     // This is the output of this subworkflow and is the format for DRAGEN alignment
     ch_gathered_samples  = Channel.empty() // [ val(sample_info), path(reads), path(fastq_list), path(empty list - placeholder for alignment file) ]
@@ -172,12 +184,27 @@ workflow GATHER_ALIGNMENT_SAMPLES {
                 }
                 .filter{ it!= [] }
         )
-    
-    //
-    // MODULE: Create fastq_list with local/staged fastq paths and appropriate metadata
-    //
+
+    // Adapter trimming and UMI alignment are not compatible.
+    // If UMI option is given, then run fastp on FASTQs to trim adapters.     
+    if (params.umi){
+        TRIM_ADAPTERS (
+            ch_gathered_fastqs.map { meta, read1, read2, runinfo -> [ meta, read1, read2 ] },
+            ch_adapter1_file,
+            ch_adapter2_file
+        )
+        ch_versions = ch_versions.mix(TRIM_ADAPTERS.out.versions)
+
+        ch_fastqs = TRIM_ADAPTERS.out.trimmed_fastqs
+            .join(ch_gathered_fastqs)
+            .map { it -> [ it[0], it[1], it[2], it[5] ] } // regenerate channel with [ meta, trimmed_read1, trimmed_read2, runinfo ]
+        
+    } else {
+        ch_fastqs = ch_gathered_fastqs
+    }
+
     CREATE_FASTQ_LIST (
-        ch_gathered_fastqs
+        ch_fastqs
     )
     ch_versions = ch_versions.mix(CREATE_FASTQ_LIST.out.versions)
 
@@ -186,7 +213,7 @@ workflow GATHER_ALIGNMENT_SAMPLES {
     //
     ch_gathered_samples = ch_gathered_samples
         .mix(
-            ch_gathered_fastqs
+            ch_fastqs
                 .filter{ it != [] }
                 .map{ meta, read1, read2, runinfo -> [ meta, [ read1, read2 ] ] }
                 .groupTuple()

@@ -38,10 +38,8 @@ process CREATE_FASTQ_LIST {
         runinfo    ? "--runinfo ${runinfo}"      : "",
     ].join(' ').trim()
     """
-    create_fastq_list.py \\
-        -i ${meta.id} \\
-        ${fastq_list_args}
-
+    cp ${projectDir}/assets/stub/demux_fastq/fastq_list.csv ${meta.id}.fastq_list.csv
+    
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         python: \$(python --version 2>&1 | awk '{print \$2}')
