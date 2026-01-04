@@ -223,7 +223,7 @@ workflow DRAGENFLOW {
     ch_dragen_inputs.dump(tag:'dragen_inputs',pretty:true)
 
     DRAGEN_MULTIALIGN (
-        ch_alignment_samples,
+        ch_dragen_inputs,
         ch_intermediate_dir,
         ch_reference_dir,
         ch_dbsnp,
