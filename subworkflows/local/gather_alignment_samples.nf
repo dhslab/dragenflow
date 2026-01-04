@@ -260,7 +260,6 @@ workflow GATHER_ALIGNMENT_SAMPLES {
 
 }
 
-
 workflow PREPARE_SOMATIC_FASTQS {
     take:
     ch_prepare_somatic_fastqs_input  //  channel: [ id, [ path(fastqlist1), fastqlist2, ... ] ]
@@ -273,17 +272,17 @@ workflow PREPARE_SOMATIC_FASTQS {
             tumor: it[0].sample_type == 'tumor'
             normal: it[0].sample_type == 'normal'
         }.set { ch_prepare_somatic_fastqs_samples }
-
+    
     ch_prepare_somatic_fastqs = ch_prepare_somatic_fastqs_samples.tumor // first get tumor samples
         .map { meta, reads, fastqlist, alignment_files ->
             [ meta.individual_id, meta, reads, fastqlist ]
         }
-        .cross( // and join with normal samples
+        .combine( // and join with normal samples
             ch_prepare_somatic_fastqs_samples.normal
             .map { meta, reads, fastqlist, alignment_files ->
                 [ meta.individual_id, meta, reads, fastqlist ]
-            }
-        ).map { tumor, normal -> [ tumor[1], tumor[2], tumor[3], normal[1], normal[2], normal[3] ] }
+            }, by: 0)
+        .map { it -> [ it[1], it[2], it[3], it[4], it[5], it[6] ] }
         // on joined samples, set tumor and normal id to meta and combine reads.
         .map { tumor_meta, tumor_reads, tumor_fastqlist, normal_meta, normal_reads, normal_fastqlist ->
             def new_meta = [:]
