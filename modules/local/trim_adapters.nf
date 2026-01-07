@@ -1,5 +1,6 @@
 process TRIM_ADAPTERS {
     tag "${meta.id}"
+    label 'process_medium'
 
     container "ghcr.io/dhslab/docker-fastp:251229"
 
@@ -15,7 +16,8 @@ process TRIM_ADAPTERS {
     script:
     def command_args = [
         read1file  ? "-i ${read1file} -o ${read1file.toString().replaceAll(/\.fq$|\.fastq$|\.fq\.gz$|\.fastq\.gz$/, '')}.R1_trimmed.fastq.gz" : "",
-        read2file  ? "-I ${read2file} -O ${read2file.toString().replaceAll(/\.fq$|\.fastq$|\.fq\.gz$|\.fastq\.gz$/, '')}.R2_trimmed.fastq.gz" : ""
+        read2file  ? "-I ${read2file} -O ${read2file.toString().replaceAll(/\.fq$|\.fastq$|\.fq\.gz$|\.fastq\.gz$/, '')}.R2_trimmed.fastq.gz" : "",
+        task.cpus  ? "-w ${task.cpus}" : ""
     ].join(' ').trim()
     """
     cat ${adapter1} ${adapter2} > adapters.fa
@@ -32,7 +34,8 @@ process TRIM_ADAPTERS {
     stub:
         def command_args = [
         read1file  ? "-i ${read1file} -o ${read1file.toString().replaceAll(/\.fq$|\.fastq$|\.fq\.gz$|\.fastq\.gz$/, '')}.R1_trimmed.fastq.gz" : "",
-        read2file  ? "-I ${read2file} -O ${read2file.toString().replaceAll(/\.fq$|\.fastq$|\.fq\.gz$|\.fastq\.gz$/, '')}.R2_trimmed.fastq.gz" : ""
+        read2file  ? "-I ${read2file} -O ${read2file.toString().replaceAll(/\.fq$|\.fastq$|\.fq\.gz$|\.fastq\.gz$/, '')}.R2_trimmed.fastq.gz" : "",
+        task.cpus  ? "-w ${task.cpus}" : ""
     ].join(' ').trim()
     """
     echo fastp ${command_args}

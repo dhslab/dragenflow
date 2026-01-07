@@ -184,6 +184,7 @@ workflow DRAGENFLOW {
     ch_dragen_usage      = Channel.empty()
     ch_demux_output      = Channel.empty()
     ch_alignment_samples = Channel.empty() // channel: [ val(meta), path(reads), path(fastq_list), path(alignment_files) ]
+    ch_dragen_inputs     = Channel.empty() // channel: [ val(meta), path(reads), path(fastq_list), path(alignment_files) ]
     ch_dragen_output     = Channel.empty()
     
     //
@@ -213,13 +214,16 @@ workflow DRAGENFLOW {
     if (params.workflow == 'somatic') {
         // for somatic workflow, need to assemble tumor and normal data
         PREPARE_SOMATIC_FASTQS(ch_alignment_samples)
-        ch_alignment_samples = PREPARE_SOMATIC_FASTQS.out.samples
+        ch_dragen_inputs = ch_dragen_inputs.mix(PREPARE_SOMATIC_FASTQS.out.samples) 
+
+    } else {
+        ch_dragen_inputs = ch_dragen_inputs.mix(ch_alignment_samples) 
     }
 
-    //ch_alignment_samples.dump(tag:'alignment_samples',pretty:true)
+    ch_dragen_inputs.dump(tag:'dragen_inputs',pretty:true)
 
     DRAGEN_MULTIALIGN (
-        ch_alignment_samples,
+        ch_dragen_inputs,
         ch_intermediate_dir,
         ch_reference_dir,
         ch_dbsnp,
