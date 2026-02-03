@@ -76,6 +76,7 @@ def make_runinfo_from_read(readpath):
     readlen = "?"
     indexlist = []
     seqlist = []
+    index_chars = set('ACGT+')
     with gzip.open(readpath, "rt") as file:
         for i, line in enumerate(file):
             if i % 4 == 0:  # Read names are on every 4th line starting from 0
@@ -83,7 +84,7 @@ def make_runinfo_from_read(readpath):
                 indexes = read_name.split(" ")
                 if len(indexes) > 1:
                     index = indexes[1].split(":")[-1]
-                    if not 'N' in index:
+                    if not 'N' in index and len(set(index) - index_chars) == 0:
                         indexlist = indexlist + [index]
 
             if i > 0 and i % 1 == 0:
@@ -114,10 +115,10 @@ def make_runinfo_from_read(readpath):
 
     # Make run info dict
     runinfo = {
-        "RunId": f"RUN_{parts[0][1:]}_{str(int(parts[1])).zfill(4)}_{parts[2]}",
-        "Flowcell": parts[2],
+        "RunId": f"RUN_{parts[0][1:].replace(' ','_')}_{str(int(parts[1])).zfill(4)}_{parts[2].replace(' ','_')}",
+        "Flowcell": parts[2].replace(" ","_"),
         "Lane": parts[3],
-        "Instrument": parts[0][1:],
+        "Instrument": parts[0][1:].replace(" ","_"),
         "Read1Cycles": f"{readlen}",
         "Index1Cycles": index1len,
         "Index1Reverse": "?",
