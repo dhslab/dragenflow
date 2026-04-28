@@ -5,3 +5,6 @@ work/
 testing/
 testing*
 *.pyc
+test.sh
+clean.sh
+.nextflow*
