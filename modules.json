@@ -1,6 +1,6 @@
 {
-    "name": "nf-core/dragenmultiworkflow",
-    "homePage": "https://github.com/nf-core/dragenmultiworkflow",
+    "name": "nf-core/dragenflow",
+    "homePage": "https://github.com/nf-core/dragenflow",
     "repos": {
         "https://github.com/nf-core/modules.git": {
             "modules": {

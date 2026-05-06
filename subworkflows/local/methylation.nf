@@ -1,37 +1,32 @@
-include { DRAGEN_5MC                      } from '../../modules/local/dragen_5mc.nf'
-include { DRAGEN_5MC as DRAGEN_FASTQS     } from '../../modules/local/dragen_5mc.nf'
-include { DRAGEN_5MC as DRAGEN_FASTQ_LIST } from '../../modules/local/dragen_5mc.nf'
-include { DRAGEN_5MC as DRAGEN_CRAM       } from '../../modules/local/dragen_5mc.nf'
-include { DRAGEN_5MC as DRAGEN_BAM       } from '../../modules/local/dragen_5mc.nf'
+include { DRAGEN_MULTIALIGN as DRAGEN_METHYLATION    } from '../../modules/local/dragen_multialign.nf'
+include { MAKE_METH_BED } from '../../modules/local/make_meth_bed.nf'
+include { MAKE_METH_BIGWIG } from '../../modules/local/make_meth_bigwig.nf'
 
 workflow METHYLATION {
     take:
-    done
-    mgi_fastqs
-    fastqs
-    fastq_list
-    cram
-    bam
+    input_data
+    dragen_inputs
 
     main:
     ch_versions = Channel.empty()
 
-    DRAGEN_5MC(mgi_fastqs, 'mgi_fastq')
-    ch_versions = ch_versions.mix(DRAGEN_5MC.out.versions)
+    DRAGEN_METHYLATION(input_data, dragen_inputs)
+    ch_versions = ch_versions.mix(DRAGEN_METHYLATION.out.versions)
 
-    DRAGEN_FASTQS(fastqs, 'fastq')
-    ch_versions = ch_versions.mix(DRAGEN_FASTQS.out.versions)
+    // Need to add a process to convert dragen methylation output to a bed file.
+    MAKE_METH_BED(DRAGEN_METHYLATION.out.dragen_output)
+    ch_versions = ch_versions.mix(MAKE_METH_BED.out.versions)
 
-    DRAGEN_FASTQ_LIST(fastq_list, 'fastq_list')
-    ch_versions = ch_versions.mix(DRAGEN_FASTQ_LIST.out.versions)
+    // make channel for reference and index
+    ch_fasta_reference = params.meth_fasta
+    ? Channel.fromPath("${params.meth_fasta}*", checkIfExists: true).collect()
+    : Channel.empty()
 
-    DRAGEN_CRAM(cram, 'cram')
-    ch_versions = ch_versions.mix(DRAGEN_CRAM.out.versions)
-
-    DRAGEN_BAM(bam, 'bam')
-    ch_versions = ch_versions.mix(DRAGEN_BAM.out.versions)
+    MAKE_METH_BIGWIG(DRAGEN_METHYLATION.out.dragen_output,ch_fasta_reference)
+    ch_versions = ch_versions.mix(MAKE_METH_BIGWIG.out.versions)
 
     emit: 
-    ch_versions
+    dragen_outputs = DRAGEN_METHYLATION.out.dragen_output
+    versions = ch_versions
 
 }

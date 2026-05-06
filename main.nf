@@ -1,11 +1,11 @@
 #!/usr/bin/env nextflow
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    nf-core/dragenmultiworkflow
+    nf-core/dragenflow
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Github : https://github.com/nf-core/dragenmultiworkflow
-    Website: https://nf-co.re/dragenmultiworkflow
-    Slack  : https://nfcore.slack.com/channels/dragenmultiworkflow
+    Github : https://github.com/nf-core/dragenflow
+    Website: https://nf-co.re/dragenflow
+    Slack  : https://nfcore.slack.com/channels/dragenflow
 ----------------------------------------------------------------------------------------
 */
 
@@ -13,47 +13,28 @@ nextflow.enable.dsl = 2
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    GENOME PARAMETER VALUES
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    VALIDATE & PRINT PARAMETER SUMMARY
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
-include { validateParameters; paramsHelp } from 'plugin/nf-validation'
-
-// Print help message if needed
-if (params.help) {
-    def logo = NfcoreTemplate.logo(workflow, params.monochrome_logs)
-    def citation = '\n' + WorkflowMain.citation(workflow) + '\n'
-    def String command = "nextflow run ${workflow.manifest.name} --input samplesheet.csv --genome GRCh37 -profile docker"
-    log.info logo + paramsHelp(command) + citation + NfcoreTemplate.dashedLine(params.monochrome_logs)
-    System.exit(0)
-}
-
-// // Validate input parameters
-if (params.validate_params) {
-    validateParameters()
-}
-
-WorkflowMain.initialise(workflow, params, log)
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     NAMED WORKFLOW FOR PIPELINE
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { DRAGENMULTIWORKFLOW } from './workflows/dragenmultiworkflow'
+include { DRAGENFLOW } from './workflows/dragenflow.nf'
+include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_dragenflow_pipeline'
+include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_dragenflow_pipeline'
 
 //
-// WORKFLOW: Run main nf-core/dragenmultiworkflow analysis pipeline
+// WORKFLOW: Run main nf-core/dragenflow analysis pipeline
 //
-workflow NFCORE_DRAGENMULTIWORKFLOW {
-    DRAGENMULTIWORKFLOW ()
+workflow NF_DRAGENFLOW {
+    take:
+    ch_samplesheet  // channel: [ path(file) ]
+
+    main:
+    DRAGENFLOW (ch_samplesheet)
+
+    emit:
+    multiqc_report = DRAGENFLOW.out.multiqc_report
+    versions       = DRAGENFLOW.out.versions
+
 }
 
 /*
@@ -67,7 +48,37 @@ workflow NFCORE_DRAGENMULTIWORKFLOW {
 // See: https://github.com/nf-core/rnaseq/issues/619
 //
 workflow {
-    NFCORE_DRAGENMULTIWORKFLOW ()
+    main:
+    ch_versions = Channel.empty()
+
+    //
+    // SUBWORKFLOW: Run initialisation tasks
+    //
+    PIPELINE_INITIALISATION (
+        params.version,
+        params.help,
+        params.validate_params,
+        params.monochrome_logs,
+        args,
+        params.outdir,
+        params.demux_outdir,
+        params.input
+    )
+    ch_versions = ch_versions.mix(PIPELINE_INITIALISATION.out.versions)
+
+    NF_DRAGENFLOW (PIPELINE_INITIALISATION.out.input)
+    ch_versions = ch_versions.mix(NF_DRAGENFLOW.out.versions)
+
+        PIPELINE_COMPLETION (
+        params.email,
+        params.email_on_fail,
+        params.plaintext_email,
+        params.outdir,
+        params.monochrome_logs,
+        params.hook_url,
+        NF_DRAGENFLOW.out.multiqc_report
+    )
+
 }
 
 /*
