@@ -64,7 +64,7 @@ process DRAGEN_MULTIALIGN {
         intermediate_directory_value                  ? "--intermediate-results-dir ${intermediate_directory_value}"          : "",
         reference_dir                                 ? "--ref-dir ${reference_dir}"                                          : "",
         cram_reference                                ? "--cram-reference ${cram_reference.min{ it.toString().length() }}"    : "",
-        dbsnp                                         ? "--dbsnp ${dbsnp}"                                                    : "",
+        !params.use_nirvana && dbsnp                  ? "--dbsnp ${dbsnp}"                                                    : "",
         params.alignment_file_format                  ? "--output-format ${params.alignment_file_format}"                     : "",
         meta.sex?.toLowerCase() in ['male', 'female'] ? "--sample-sex ${meta.sex}"                                            : "",
         !params.umi && adapter1 && adapter2           ? "--read-trimmers adapter --trim-adapter-read1 ${adapter1} --trim-adapter-read2 ${adapter2}" : "",
