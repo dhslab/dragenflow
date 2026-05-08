@@ -1,8 +1,8 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema",
-    "$id": "https://raw.githubusercontent.com/nf-core/dragenflow/master/nextflow_schema.json",
-    "title": "nf-core/dragenflow pipeline parameters",
-    "description": "Run multple dragen workflows (5mc,rna,tumor_normal)",
+    "$id": "https://raw.githubusercontent.com/dhslab/dragenflow/master/nextflow_schema.json",
+    "title": "dhslab/dragenflow pipeline parameters",
+    "description": "Nextflow pipeline for running DRAGEN alignment and variant calling workflows (germline, somatic, RNA-seq, methylation).",
     "type": "object",
     "definitions": {
         "input_output_options": {
@@ -10,25 +10,388 @@
             "type": "object",
             "fa_icon": "fas fa-terminal",
             "description": "Define where the pipeline should find input data and save output data.",
-            "required": ["outdir", "input", "workflow"],
+            "required": ["input", "outdir"],
             "properties": {
+                "input": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Path to samplesheet CSV file. Supports reads (read1/read2), BAM/CRAM, fastq_list, demux_path, or samplemap columns. See README for format details.",
+                    "fa_icon": "fas fa-file-csv"
+                },
                 "outdir": {
                     "type": "string",
                     "format": "directory-path",
-                    "description": "The output directory where the results will be saved. You have to use absolute paths to storage on Cloud infrastructure.",
+                    "description": "Output directory where results will be saved. Use absolute paths for cloud infrastructure.",
                     "fa_icon": "fas fa-folder-open"
+                },
+                "demux_outdir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Directory containing demultiplexed FASTQ output (with Reports/fastq_list.csv). Used when providing pre-demuxed data.",
+                    "fa_icon": "fas fa-folder"
+                },
+                "tracedir": {
+                    "type": "string",
+                    "description": "Directory for pipeline execution trace files.",
+                    "default": "${params.outdir}/pipeline_info",
+                    "hidden": true,
+                    "fa_icon": "fas fa-cogs"
                 },
                 "email": {
                     "type": "string",
-                    "description": "Email address for completion summary.",
+                    "description": "Email address for pipeline completion summary.",
                     "fa_icon": "fas fa-envelope",
-                    "help_text": "Set this parameter to your e-mail address to get a summary e-mail with details of the run sent to you when the workflow exits. If set in your user config file (`~/.nextflow/config`) then you don't need to specify this on the command line for every run.",
                     "pattern": "^([a-zA-Z0-9_\\-\\.]+)@([a-zA-Z0-9_\\-\\.]+)\\.([a-zA-Z]{2,5})$"
                 },
                 "multiqc_title": {
                     "type": "string",
-                    "description": "MultiQC report title. Printed as page header, used for filename if not otherwise specified.",
+                    "description": "MultiQC report title. Used as page header and filename prefix.",
                     "fa_icon": "fas fa-file-signature"
+                }
+            }
+        },
+        "workflow_options": {
+            "title": "Workflow options",
+            "type": "object",
+            "fa_icon": "fas fa-project-diagram",
+            "description": "Select the analysis mode and control core pipeline behavior.",
+            "required": ["workflow"],
+            "properties": {
+                "workflow": {
+                    "type": "string",
+                    "description": "Analysis workflow mode. Typically set by the analysis profile rather than on the command line.",
+                    "enum": ["align", "germline", "somatic", "tumor", "rna", "bsseq"],
+                    "fa_icon": "fas fa-sitemap"
+                },
+                "run_dragen": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Execute the DRAGEN alignment step. Set to false to skip DRAGEN (e.g., for testing samplesheet parsing).",
+                    "fa_icon": "fas fa-play"
+                },
+                "extra_dragen_args": {
+                    "type": "string",
+                    "description": "Additional raw arguments appended to the DRAGEN command line. Useful for one-off flags not covered by parameters.",
+                    "fa_icon": "fas fa-terminal"
+                }
+            }
+        },
+        "dragen_alignment_options": {
+            "title": "DRAGEN alignment options",
+            "type": "object",
+            "fa_icon": "fas fa-align-left",
+            "description": "Options controlling DRAGEN alignment behavior and reference files.",
+            "properties": {
+                "refdir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "default": "/storage2/fs1/dspencer/Active/shared/refdata/hg38/dragen_hg38v4.3.6",
+                    "description": "Path to the DRAGEN hash-table reference directory.",
+                    "fa_icon": "fas fa-database"
+                },
+                "methylation_refdir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to the DRAGEN bisulfite/methylation hash-table reference directory. Set automatically by the bsseq profile.",
+                    "fa_icon": "fas fa-database"
+                },
+                "fasta": {
+                    "type": "string",
+                    "format": "file-path",
+                    "default": "/storage2/fs1/dspencer/Active/shared/refdata/hg38/sequence/hg38_mgi_patch.fa",
+                    "description": "Path to the genome FASTA reference. Used for CRAM decoding and downstream annotation.",
+                    "fa_icon": "fas fa-file"
+                },
+                "cram_reference": {
+                    "type": "string",
+                    "format": "file-path",
+                    "default": "/storage2/fs1/dspencer/Active/shared/refdata/hg38/sequence/hg38_mgi_patch.fa",
+                    "description": "FASTA reference used when reading input CRAM files.",
+                    "fa_icon": "fas fa-file"
+                },
+                "dbsnp": {
+                    "type": "string",
+                    "format": "file-path",
+                    "default": "/storage2/fs1/dspencer/Active/shared/refdata/hg38/dragenfiles/dbsnp.vcf.gz",
+                    "description": "dbSNP VCF for variant annotation. Used when Nirvana annotation is disabled.",
+                    "fa_icon": "fas fa-file-alt"
+                },
+                "intermediate_dir": {
+                    "type": "string",
+                    "default": "/staging/intermediate-results-dir",
+                    "description": "DRAGEN intermediate results directory. Paths beginning with /staging are treated as on-DRAGEN-hardware paths.",
+                    "fa_icon": "fas fa-folder"
+                },
+                "adapter1": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "FASTA file of adapter sequences for read 1. Defaults to bundled DRAGEN adapter sequences.",
+                    "fa_icon": "fas fa-file"
+                },
+                "adapter2": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "FASTA file of adapter sequences for read 2. Defaults to bundled DRAGEN adapter sequences.",
+                    "fa_icon": "fas fa-file"
+                },
+                "alignment_file_format": {
+                    "type": "string",
+                    "default": "CRAM",
+                    "description": "Output alignment file format.",
+                    "enum": ["CRAM", "BAM"],
+                    "fa_icon": "fas fa-file-archive"
+                },
+                "mark_duplicates": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable DRAGEN duplicate marking. Set to false when using UMI-based deduplication.",
+                    "fa_icon": "fas fa-clone"
+                },
+                "pangenome_reference": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Validate pangenome reference. Enable when using a pangenome DRAGEN reference.",
+                    "fa_icon": "fas fa-dna",
+                    "hidden": true
+                },
+                "target_bedfile": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Target BED file for exome or panel sequencing. Enables exome-mode SV and CNV calling and restricts variant calling to targeted regions.",
+                    "fa_icon": "fas fa-crosshairs"
+                }
+            }
+        },
+        "dragen_variant_calling_options": {
+            "title": "DRAGEN variant calling options",
+            "type": "object",
+            "fa_icon": "fas fa-search",
+            "description": "Options for SNV, SV, and CNV variant calling.",
+            "properties": {
+                "variant_caller": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable DRAGEN small variant (SNV/indel) caller.",
+                    "fa_icon": "fas fa-dna"
+                },
+                "sv_caller": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable DRAGEN structural variant (SV) caller.",
+                    "fa_icon": "fas fa-exchange-alt"
+                },
+                "cnv_caller": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable DRAGEN copy number variant (CNV) caller.",
+                    "fa_icon": "fas fa-chart-bar"
+                },
+                "hotspot_vcf": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "VCF of somatic hotspot positions passed to --vc-somatic-hotspots.",
+                    "fa_icon": "fas fa-fire"
+                },
+                "hotspot_bed": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "BED file used to generate a hotspot VCF on the fly (alternative to --hotspot_vcf).",
+                    "fa_icon": "fas fa-fire"
+                },
+                "snv_noisefile": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Systematic noise BED file for SNV filtering (--vc-systematic-noise).",
+                    "fa_icon": "fas fa-filter"
+                },
+                "sv_noisefile": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Systematic noise BEDPE file for SV filtering (--sv-systematic-noise).",
+                    "fa_icon": "fas fa-filter"
+                },
+                "cnv_population_vcf": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Population B-allele frequency VCF for CNV calling (--cnv-population-b-allele-vcf). Required for tumor-only CNV calling.",
+                    "fa_icon": "fas fa-file-alt"
+                },
+                "dragen_tandem_dup_hotspots": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "BED file of somatic insertion/tandem duplication hotspot regions (--sv-somatic-ins-tandup-hotspot-regions-bed).",
+                    "fa_icon": "fas fa-fire"
+                },
+                "dragen_cnv_filter_length": {
+                    "type": "integer",
+                    "description": "Minimum CNV length (bp) to report (--cnv-filter-length). Recommended: 500000 for tumor-only WGS.",
+                    "fa_icon": "fas fa-ruler"
+                },
+                "dragen_cnv_merge_distance": {
+                    "type": "integer",
+                    "description": "Maximum distance (bp) between adjacent CNV segments to merge (--cnv-merge-distance). Recommended: 2000000 for tumor-only WGS.",
+                    "fa_icon": "fas fa-compress-arrows-alt"
+                },
+                "sv_annotation_distance": {
+                    "type": "integer",
+                    "description": "Maximum distance (bp) for SV breakend annotation matching. Used in downstream SV annotation.",
+                    "fa_icon": "fas fa-ruler"
+                },
+                "max_filter_sv_length": {
+                    "type": "integer",
+                    "description": "Maximum SV length (bp) to retain in downstream annotation. SVs larger than this are filtered.",
+                    "fa_icon": "fas fa-ruler"
+                },
+                "dux4caller": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable DRAGEN DUX4 rearrangement caller (--enable-dux4-caller). For hematologic malignancies with potential DUX4-IGH fusions.",
+                    "fa_icon": "fas fa-search-plus"
+                },
+                "solid_tumor": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable solid tumor UMI variant calling mode (--vc-enable-umi-solid).",
+                    "fa_icon": "fas fa-circle"
+                },
+                "liquid_tumor": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable liquid tumor UMI variant calling mode (--vc-enable-umi-liquid). For hematologic malignancies.",
+                    "fa_icon": "fas fa-tint"
+                }
+            }
+        },
+        "dragen_umi_options": {
+            "title": "DRAGEN UMI options",
+            "type": "object",
+            "fa_icon": "fas fa-barcode",
+            "description": "Options for UMI-based library processing and deduplication.",
+            "properties": {
+                "umi": {
+                    "type": "string",
+                    "description": "UMI library type passed to --umi-library-type. Set to 'random-simplex' for IDT UDI-UMI libraries. When set, duplicate marking is typically disabled and adapters are trimmed with fastp before DRAGEN.",
+                    "fa_icon": "fas fa-barcode"
+                },
+                "readfamilysize": {
+                    "type": "integer",
+                    "default": 3,
+                    "description": "Minimum number of reads in a UMI family to support a variant (--umi-min-supporting-reads).",
+                    "fa_icon": "fas fa-layer-group"
+                }
+            }
+        },
+        "dragen_rna_options": {
+            "title": "DRAGEN RNA-seq options",
+            "type": "object",
+            "fa_icon": "fas fa-stream",
+            "description": "Options specific to the RNA-seq workflow (workflow=rna).",
+            "properties": {
+                "annotation_gtf": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Gene annotation GTF file for RNA-seq alignment and quantification (-a). Must be gzip-compressed and sorted.",
+                    "fa_icon": "fas fa-file-alt"
+                },
+                "transcript_table": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Transcript-to-gene mapping table used to annotate DRAGEN quantification output with gene names.",
+                    "fa_icon": "fas fa-table"
+                },
+                "downsample_rna": {
+                    "type": "integer",
+                    "description": "Downsample RNA-seq reads to this many reads (--enable-down-sampler / --down-sampler-reads). Useful for large samples.",
+                    "fa_icon": "fas fa-compress"
+                }
+            }
+        },
+        "annotation_options": {
+            "title": "Variant annotation options",
+            "type": "object",
+            "fa_icon": "fas fa-tags",
+            "description": "Options for VEP and Nirvana variant annotation.",
+            "properties": {
+                "vepcache": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "default": "/storage2/fs1/dspencer/Active/shared/refdata/hg38/VEP113_cache",
+                    "description": "Path to the VEP cache directory used for SNV, SV, and CNV annotation.",
+                    "fa_icon": "fas fa-database"
+                },
+                "cytobands": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Cytogenetic band BED file (gzip-compressed) for SV and CNV annotation. Defaults to bundled hg38 cytobands.",
+                    "fa_icon": "fas fa-file"
+                },
+                "use_nirvana": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Use Nirvana for in-DRAGEN variant annotation instead of dbSNP-only annotation. Requires --nirvana_path.",
+                    "fa_icon": "fas fa-tags"
+                },
+                "nirvana_path": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "default": "/storage2/fs1/dspencer/Active/shared/refdata/hg38/dragenfiles/nirvana_annotation_data_323",
+                    "description": "Path to the Nirvana annotation data directory (--variant-annotation-data).",
+                    "fa_icon": "fas fa-database"
+                },
+                "nirvana_assembly": {
+                    "type": "string",
+                    "default": "GRCh38",
+                    "description": "Genome assembly name for Nirvana (--variant-annotation-assembly).",
+                    "fa_icon": "fas fa-dna",
+                    "hidden": true
+                }
+            }
+        },
+        "compute_options": {
+            "title": "Compute cluster options",
+            "type": "object",
+            "fa_icon": "fas fa-server",
+            "description": "Options for WashU RIS compute cluster job submission.",
+            "properties": {
+                "user_group": {
+                    "type": "string",
+                    "default": "compute-dspencer",
+                    "description": "LSF user group for compute1 job submission (-G flag).",
+                    "fa_icon": "fas fa-users"
+                },
+                "queue": {
+                    "type": "string",
+                    "default": "general",
+                    "description": "LSF queue name for compute1 job submission (-q flag).",
+                    "fa_icon": "fas fa-list"
+                },
+                "job_group_name": {
+                    "type": "string",
+                    "description": "LSF job group name for compute1 job scheduling (-g flag). e.g. /dspencer/nextflow",
+                    "fa_icon": "fas fa-layer-group"
+                },
+                "slurm_partition": {
+                    "type": "string",
+                    "default": "general-cpu",
+                    "description": "SLURM partition for compute2 job submission.",
+                    "fa_icon": "fas fa-server"
+                },
+                "singularity_cache": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Directory for caching Singularity images on compute2.",
+                    "fa_icon": "fas fa-box"
+                },
+                "local_dragen_container": {
+                    "type": "string",
+                    "default": "apldx/oracle8-dragen-4.3.6",
+                    "description": "Docker image name for on-premise DRAGEN jobs.",
+                    "fa_icon": "fab fa-docker"
+                },
+                "aws_dragen_container": {
+                    "type": "string",
+                    "description": "AWS Batch job definition ARN or name for DRAGEN jobs on AWS. e.g. job-definition://dragen_v4-4-6",
+                    "fa_icon": "fab fa-aws"
                 }
             }
         },
@@ -36,20 +399,27 @@
             "title": "Reference genome options",
             "type": "object",
             "fa_icon": "fas fa-dna",
-            "description": "Reference genome related files and options required for the workflow.",
+            "description": "iGenomes reference options (not used by default).",
             "properties": {
                 "genome": {
                     "type": "string",
-                    "description": "Name of iGenomes reference.",
+                    "description": "iGenomes reference name. Not used by this pipeline (igenomes_ignore=true by default).",
                     "fa_icon": "fas fa-book",
-                    "help_text": "If using a reference genome configured in the pipeline using iGenomes, use this parameter to give the ID for the reference. This is then used to build the full paths for all required reference genome files e.g. `--genome GRCh38`. \n\nSee the [nf-core website docs](https://nf-co.re/usage/reference_genomes) for more details."
+                    "hidden": true
+                },
+                "igenomes_base": {
+                    "type": "string",
+                    "default": "s3://ngi-igenomes/igenomes",
+                    "description": "Base URL for iGenomes reference files.",
+                    "fa_icon": "fas fa-cloud-download-alt",
+                    "hidden": true
                 },
                 "igenomes_ignore": {
                     "type": "boolean",
-                    "description": "Do not load the iGenomes reference config.",
+                    "default": true,
+                    "description": "Do not load iGenomes reference config.",
                     "fa_icon": "fas fa-ban",
-                    "hidden": true,
-                    "help_text": "Do not load `igenomes.config` when running the pipeline. You may choose this option if you observe clashes between custom parameters and those supplied in `igenomes.config`."
+                    "hidden": true
                 }
             }
         },
@@ -72,7 +442,6 @@
                     "description": "Base directory for Institutional configs.",
                     "default": "https://raw.githubusercontent.com/nf-core/configs/master",
                     "hidden": true,
-                    "help_text": "If you're running offline, Nextflow will not be able to fetch the institutional config files from the internet. If you don't need them, then this is not a problem. If you do need them, you should download the files from the repo and tell Nextflow where to find them with this parameter.",
                     "fa_icon": "fas fa-users-cog"
                 },
                 "config_profile_name": {
@@ -106,15 +475,14 @@
             "type": "object",
             "fa_icon": "fab fa-acquisitions-incorporated",
             "description": "Set the top limit for requested resources for any single job.",
-            "help_text": "If you are running on a smaller system, a pipeline step requesting more resources than are available may cause the Nextflow to stop the run with an error. These options allow you to cap the maximum resources requested by any single job so that the pipeline will run on your system.\n\nNote that you can not _increase_ the resources requested by any job using these options. For that you will need your own configuration file. See [the nf-core website](https://nf-co.re/usage/configuration) for details.",
+            "help_text": "If you are running on a smaller system, a pipeline step requesting more resources than are available may cause the Nextflow to stop the run with an error. These options allow you to cap the maximum resources requested by any single job so that the pipeline will run on your system.",
             "properties": {
                 "max_cpus": {
                     "type": "integer",
                     "description": "Maximum number of CPUs that can be requested for any single job.",
                     "default": 16,
                     "fa_icon": "fas fa-microchip",
-                    "hidden": true,
-                    "help_text": "Use to set an upper-limit for the CPU requirement for each process. Should be an integer e.g. `--max_cpus 1`"
+                    "hidden": true
                 },
                 "max_memory": {
                     "type": "string",
@@ -122,8 +490,7 @@
                     "default": "128.GB",
                     "fa_icon": "fas fa-memory",
                     "pattern": "^\\d+(\\.\\d+)?\\.?\\s*(K|M|G|T)?B$",
-                    "hidden": true,
-                    "help_text": "Use to set an upper-limit for the memory requirement for each process. Should be a string in the format integer-unit e.g. `--max_memory '8.GB'`"
+                    "hidden": true
                 },
                 "max_time": {
                     "type": "string",
@@ -131,8 +498,7 @@
                     "default": "240.h",
                     "fa_icon": "far fa-clock",
                     "pattern": "^(\\d+\\.?\\s*(s|m|h|d|day)\\s*)+$",
-                    "hidden": true,
-                    "help_text": "Use to set an upper-limit for the time requirement for each process. Should be a string in the format integer-unit e.g. `--max_time '2.h'`"
+                    "hidden": true
                 }
             }
         },
@@ -141,7 +507,6 @@
             "type": "object",
             "fa_icon": "fas fa-file-import",
             "description": "Less common options for the pipeline, typically set in a config file.",
-            "help_text": "These options are common to all nf-core pipelines and allow you to customise some of the core preferences for how the pipeline runs.\n\nTypically these options would be set in a Nextflow config file loaded for all pipeline runs, such as `~/.nextflow/config`.",
             "properties": {
                 "help": {
                     "type": "boolean",
@@ -159,7 +524,6 @@
                     "type": "string",
                     "default": "copy",
                     "description": "Method used to save pipeline results to output directory.",
-                    "help_text": "The Nextflow `publishDir` option specifies which intermediate files should be saved to the output directory. This option tells the pipeline what method should be used to move these files. See [Nextflow docs](https://www.nextflow.io/docs/latest/process.html#publishdir) for details.",
                     "fa_icon": "fas fa-copy",
                     "enum": ["symlink", "rellink", "link", "copy", "copyNoFollow", "move"],
                     "hidden": true
@@ -169,7 +533,6 @@
                     "description": "Email address for completion summary, only when pipeline fails.",
                     "fa_icon": "fas fa-exclamation-triangle",
                     "pattern": "^([a-zA-Z0-9_\\-\\.]+)@([a-zA-Z0-9_\\-\\.]+)\\.([a-zA-Z]{2,5})$",
-                    "help_text": "An email address to send a summary email to when the pipeline is completed - ONLY sent if the pipeline does not exit successfully.",
                     "hidden": true
                 },
                 "plaintext_email": {
@@ -194,9 +557,8 @@
                 },
                 "hook_url": {
                     "type": "string",
-                    "description": "Incoming hook URL for messaging service",
+                    "description": "Incoming hook URL for MS Teams or Slack notifications.",
                     "fa_icon": "fas fa-people-group",
-                    "help_text": "Incoming hook URL for messaging service. Currently, MS Teams and Slack are supported.",
                     "hidden": true
                 },
                 "multiqc_config": {
@@ -208,18 +570,19 @@
                 },
                 "multiqc_logo": {
                     "type": "string",
-                    "description": "Custom logo file to supply to MultiQC. File name must also be set in the MultiQC config file",
+                    "description": "Custom logo file to supply to MultiQC. File name must also be set in the MultiQC config file.",
                     "fa_icon": "fas fa-image",
                     "hidden": true
                 },
                 "multiqc_methods_description": {
                     "type": "string",
-                    "description": "Custom MultiQC yaml file containing HTML including a methods description.",
-                    "fa_icon": "fas fa-cog"
+                    "description": "Custom MultiQC YAML file containing HTML methods description.",
+                    "fa_icon": "fas fa-cog",
+                    "hidden": true
                 },
                 "validate_params": {
                     "type": "boolean",
-                    "description": "Boolean whether to validate parameters against the schema at runtime",
+                    "description": "Validate parameters against the schema at runtime.",
                     "default": true,
                     "fa_icon": "fas fa-check-square",
                     "hidden": true
@@ -227,92 +590,42 @@
                 "validationShowHiddenParams": {
                     "type": "boolean",
                     "fa_icon": "far fa-eye-slash",
-                    "description": "Show all params when using `--help`",
-                    "hidden": true,
-                    "help_text": "By default, parameters set as _hidden_ in the schema are not shown on the command line when a user runs with `--help`. Specifying this option will tell the pipeline to show all parameters."
+                    "description": "Show all params when using --help, including hidden parameters.",
+                    "hidden": true
                 },
                 "validationFailUnrecognisedParams": {
                     "type": "boolean",
                     "fa_icon": "far fa-check-circle",
-                    "description": "Validation of parameters fails when an unrecognised parameter is found.",
-                    "hidden": true,
-                    "help_text": "By default, when an unrecognised parameter is found, it returns a warinig."
+                    "description": "Fail validation if an unrecognised parameter is found.",
+                    "hidden": true
                 },
                 "validationLenientMode": {
                     "type": "boolean",
                     "fa_icon": "far fa-check-circle",
-                    "description": "Validation of parameters in lenient more.",
-                    "hidden": true,
-                    "help_text": "Allows string values that are parseable as numbers or booleans. For further information see [JSONSchema docs](https://github.com/everit-org/json-schema#lenient-mode)."
+                    "description": "Allow string values parseable as numbers or booleans during validation.",
+                    "hidden": true
+                },
+                "validationSchemaIgnoreParams": {
+                    "type": "string",
+                    "description": "Comma-separated list of parameter names to ignore during schema validation.",
+                    "default": "genomes,igenomes_base",
+                    "hidden": true
                 }
             }
         }
     },
     "allOf": [
-        {
-            "$ref": "#/definitions/input_output_options"
-        },
-        {
-            "$ref": "#/definitions/reference_genome_options"
-        },
-        {
-            "$ref": "#/definitions/institutional_config_options"
-        },
-        {
-            "$ref": "#/definitions/max_job_request_options"
-        },
-        {
-            "$ref": "#/definitions/generic_options"
-        }
-    ],
-    "properties": {
-        "user_group": {
-            "type": "string",
-            "default": "compute-dspencer"
-        },
-        "queue": {
-            "type": "string",
-            "default": "dspencer"
-        },
-        "job_group_name": {
-            "type": "string",
-            "default": "/dnidhi"
-        },
-        "dragen_container": {
-            "type": "string",
-            "default": "etycksen/dragen4:4.2.4"
-        },
-        "reference": {
-            "type": "string",
-            "default": "/storage1/fs1/dspencer/Active/spencerlab/refdata/hg38/dragen424_hg38"
-        },
-        "meth_ref": {
-            "type": "string",
-            "default": "/storage1/fs1/dspencer/Active/spencerlab/refdata/hg38/dragen_5mCv4.2.4"
-        },
-        "annotation_file": {
-            "type": "string",
-            "default": "/storage1/fs1/dspencer/Active/spencerlab/refdata/hg38/ensemble/Homo_sapiens.GRCh38.105.chr.sorted.gtf.gz"
-        },
-        "dbsnp": {
-            "type": "string",
-            "default": "/storage1/fs1/dspencer/Active/clinseq/projects/chromoseq/refdata/dragen_align_inputs/hg38/dbsnp.vcf.gz"
-        },
-        "read1_adapter": {
-            "type": "string",
-            "default": "/storage1/fs1/dspencer/Active/clinseq/projects/chromoseq/refdata/dragen_align_inputs/hg38/dragen_adapter1.fa"
-        },
-        "read2_adapter": {
-            "type": "string",
-            "default": "/storage1/fs1/dspencer/Active/clinseq/projects/chromoseq/refdata/dragen_align_inputs/hg38/dragen_adapter2.fa"
-        },
-        "annotation_data": {
-            "type": "string",
-            "default": "/storage1/fs1/dspencer/Active/clinseq/projects/chromoseq/refdata/dragen_align_inputs/hg38/nirvana_annotation_data"
-        },
-        "workflow": {
-            "type": "string"
-        }
-    },
-    "required": ["workflow"]
+        { "$ref": "#/definitions/input_output_options" },
+        { "$ref": "#/definitions/workflow_options" },
+        { "$ref": "#/definitions/dragen_alignment_options" },
+        { "$ref": "#/definitions/dragen_variant_calling_options" },
+        { "$ref": "#/definitions/dragen_umi_options" },
+        { "$ref": "#/definitions/dragen_rna_options" },
+        { "$ref": "#/definitions/annotation_options" },
+        { "$ref": "#/definitions/compute_options" },
+        { "$ref": "#/definitions/reference_genome_options" },
+        { "$ref": "#/definitions/institutional_config_options" },
+        { "$ref": "#/definitions/max_job_request_options" },
+        { "$ref": "#/definitions/generic_options" }
+    ]
 }
