@@ -127,6 +127,8 @@ workflow GATHER_ALIGNMENT_SAMPLES {
             .map{ meta, read1, read2 -> [ meta, read1, read2, [] ] }
     )
 
+    ch_sample_alignment_meta.dump(tag:'alignment_meta', pretty:true)
+
     //
     // Collect reads, fastq_list, and runinfo.
     //
@@ -145,7 +147,7 @@ workflow GATHER_ALIGNMENT_SAMPLES {
                     def requiredColumns = ['RGID', 'RGSM', 'RGLB', 'Lane', 'Read1File', 'Read2File']
                     def fastq_list = file(meta.fastq_list, checkIfExists: true)                    
                     def data = parseFastqList(fastq_list)
-                    data = data.findAll{ it.RGSM == newMeta.id }                    
+                    data = data.findAll{ it.RGSM == newMeta.sample_id || it.RGSM == newMeta.id }                    
                     data.collect{
                         if (!it.keySet().containsAll(requiredColumns)) {
                             error("Missing required columns in input FastQ list!")
@@ -184,6 +186,9 @@ workflow GATHER_ALIGNMENT_SAMPLES {
                 }
                 .filter{ it!= [] }
         )
+
+
+    ch_gathered_fastqs.dump(tag:'gathered_fastqs', pretty:true)
 
     // Adapter trimming and UMI alignment are not compatible.
     // If UMI option is given, then run fastp on FASTQs to trim adapters.     
