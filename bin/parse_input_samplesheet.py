@@ -116,7 +116,7 @@ def process_input(input_file: str, output_dir: str) -> None:
             "id",
             "individual_id",
             "sample_type",
-            "sample_id"
+            "sample_id",
             "sex",
             "read1",
             "read2",

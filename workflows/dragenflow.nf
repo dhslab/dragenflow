@@ -130,11 +130,6 @@ ch_nirvana_path = params.nirvana_path && params.use_nirvana == true
     ? Channel.fromPath(params.nirvana_path, type: 'dir', checkIfExists: true).collect()
     : Channel.value([])
 
-// Indicator channel to run dragen
-ch_run_dragen = params.run_dragen
-    ? Channel.value(params.run_dragen)
-    : Channel.empty()
-
 /*
 ~~~~~~~~~~~~~~~~~~
 MultiQC parameters
@@ -222,26 +217,29 @@ workflow DRAGENFLOW {
 
     ch_dragen_inputs.dump(tag:'dragen_inputs',pretty:true)
 
-    DRAGEN_MULTIALIGN (
-        ch_dragen_inputs,
-        ch_intermediate_dir,
-        ch_reference_dir,
-        ch_dbsnp,
-        ch_adapter1_file,
-        ch_adapter2_file,
-        ch_cram_reference,
-        ch_sv_noisefile,
-        ch_snv_noisefile,
-        ch_hotspot_vcf,
-        ch_cnv_population_vcf,
-        ch_dragen_tandem_dup_hotspots,
-        ch_target_bed,
-        ch_annotation_gtf,
-        ch_nirvana_path
-    )
-    ch_dragen_output = ch_dragen_output.mix(DRAGEN_MULTIALIGN.out.dragen_output)
-    ch_versions     = ch_versions.mix(DRAGEN_MULTIALIGN.out.versions)
-    ch_dragen_usage = ch_dragen_usage.mix(DRAGEN_MULTIALIGN.out.usage)
+    if (params.run_dragen == true) {
+
+        DRAGEN_MULTIALIGN (
+            ch_dragen_inputs,
+            ch_intermediate_dir,
+            ch_reference_dir,
+            ch_dbsnp,
+            ch_adapter1_file,
+            ch_adapter2_file,
+            ch_cram_reference,
+            ch_sv_noisefile,
+            ch_snv_noisefile,
+            ch_hotspot_vcf,
+            ch_cnv_population_vcf,
+            ch_dragen_tandem_dup_hotspots,
+            ch_target_bed,
+            ch_annotation_gtf,
+            ch_nirvana_path
+        )
+        ch_dragen_output = ch_dragen_output.mix(DRAGEN_MULTIALIGN.out.dragen_output)
+        ch_versions     = ch_versions.mix(DRAGEN_MULTIALIGN.out.versions)
+        ch_dragen_usage = ch_dragen_usage.mix(DRAGEN_MULTIALIGN.out.usage)
+    }
 
     ANNOTATE_VARIANTS (
         ch_dragen_output.map{ meta, files -> 
