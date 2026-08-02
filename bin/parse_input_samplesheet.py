@@ -114,7 +114,6 @@ def process_input(input_file: str, output_dir: str) -> None:
     # remove columns if not valid header
     valid_headers = [
             "id",
-            "individual_id",
             "sample_type",
             "sample_id",
             "sex",

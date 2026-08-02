@@ -372,11 +372,18 @@
                 },
                 "slurm_partition": {
                     "type": "string",
-                    "default": "general-cpu",
+                    "default": "condo-dspencer",
                     "description": "SLURM partition for compute2 job submission.",
                     "fa_icon": "fas fa-server"
                 },
-                "singularity_cache": {
+                "slurm_account": {
+                    "type": "string",
+                    "default": "compute2-dspencer",
+                    "description": "SLURM account for compute2 job submission.",
+                    "fa_icon": "fas fa-server"
+                },
+
+                "apptainer_cache": {
                     "type": "string",
                     "format": "directory-path",
                     "description": "Directory for caching Singularity images on compute2.",
@@ -387,11 +394,6 @@
                     "default": "apldx/oracle8-dragen-4.3.6",
                     "description": "Docker image name for on-premise DRAGEN jobs.",
                     "fa_icon": "fab fa-docker"
-                },
-                "aws_dragen_container": {
-                    "type": "string",
-                    "description": "AWS Batch job definition ARN or name for DRAGEN jobs on AWS. e.g. job-definition://dragen_v4-4-6",
-                    "fa_icon": "fab fa-aws"
                 }
             }
         },
