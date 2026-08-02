@@ -8,3 +8,6 @@ testing*
 test.sh
 clean.sh
 .nextflow*
+.dir_bash_history
+*.log
+*.err
