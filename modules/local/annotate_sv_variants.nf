@@ -1,7 +1,7 @@
 process ANNOTATE_SV_VARIANTS {
     tag "${meta.id}"
     label "process_medium"
-    container "ghcr.io/dhslab/docker-vep_release113:250810"
+    container "ghcr.io/dhslab/docker-vep_release113:260508"
     publishDir "$params.outdir/${meta.id}/", saveAs: { filename -> filename.equals("versions.yml") ? null : filename }, mode:'copy'
 
     input:

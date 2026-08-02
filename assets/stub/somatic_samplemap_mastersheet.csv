@@ -1,0 +1,4 @@
+id,sample_id,sample_type,samplemap
+KDM7A-KO-CART,CD34-CART-DNA,normal,/storage2/fs1/dspencer/Active/spencerlab/dhs/git/dragenflow/assets/stub/demux_fastq/Samplemap2.somatic.csv
+KDM7A-KO-CART,KDM7A-KO-CART-DNA,tumor,/storage2/fs1/dspencer/Active/spencerlab/dhs/git/dragenflow/assets/stub/demux_fastq/Samplemap2.somatic.csv
+

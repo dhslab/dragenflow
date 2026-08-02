@@ -39,6 +39,7 @@ def parse_arguments():
         description="Prepare fastq_list.csv file from a passed list file or reads. If a Runparameters.xml file is passed, additional metadata is added."
     )
     parser.add_argument("-i", "--id", type=str, required=True, help="Sample ID")
+    parser.add_argument("--umi", action="store_true", help="Indicate if UMIs are used") # This is to check for multiple RGLB for the same sample when UMIs are used
     parser.add_argument("-1", "--read1", type=check_file, help="Path to read1")
     parser.add_argument("-2", "--read2", type=check_file, help="Path to read2")
     parser.add_argument(
@@ -59,23 +60,44 @@ def check_file(file_path):
 
 
 # NOTE(dhs): get flowcell, lane, read length from reads to make runinfo
-def make_runinfo_from_read(readpath):
+def make_runinfo_from_read(readpath, check_umi=False):
     # open read 1 fastq and read header and get seq length
     readName = ""
     with gzip.open(readpath, "rt") as gz_file:
         readName = gz_file.readline().strip()
 
-    # if indexes are present in the read header, get the first 100
-    # and find the most common one (to account for mismatches/errors in index read)
-    parts = readName.split(":")
+    flowcell = "UNKNOWN"
+    lane = "UNKNOWN"
+    instrument = "UNKNOWN"
+    runid = "UNKNOWN"
     index1 = "UNKNOWN"
     index2 = "UNKNOWN"
     index1len = "?"
     index2len = "?"
     indexes = readName.split(" ")
     readlen = "?"
+    
+    parts = readName.split(":")
+    
+    if len(parts) >= 4:
+        flowcell = parts[2]
+        lane = parts[3]
+        instrument = parts[0][1:]
+        runid = f"RUN_{parts[0][1:]}_{str(int(parts[1])).zfill(4)}_{parts[2]}"
+
+    # Index 
     indexlist = []
     seqlist = []
+    index_chars = set('ACGT+')
+
+    # if args.umi is True, check that there are UMIs in the last part of the read name by testing for non ACTGN+ characters in parts[-1]
+    if check_umi and len(set(parts[-1]) - index_chars) > 0:
+        # No UMIs found, error
+        print(f"UMIs are indicated, but no UMIs found in read name: {readName}")
+        sys.exit(1)
+    
+    # if indexes are present in the read header, get the first 100
+    # and find the most common one (to account for mismatches/errors in index read)    
     with gzip.open(readpath, "rt") as file:
         for i, line in enumerate(file):
             if i % 4 == 0:  # Read names are on every 4th line starting from 0
@@ -83,7 +105,7 @@ def make_runinfo_from_read(readpath):
                 indexes = read_name.split(" ")
                 if len(indexes) > 1:
                     index = indexes[1].split(":")[-1]
-                    if not 'N' in index:
+                    if not 'N' in index and len(set(index) - index_chars) == 0:
                         indexlist = indexlist + [index]
 
             if i > 0 and i % 1 == 0:
@@ -114,10 +136,10 @@ def make_runinfo_from_read(readpath):
 
     # Make run info dict
     runinfo = {
-        "RunId": f"RUN_{parts[0][1:]}_{str(int(parts[1])).zfill(4)}_{parts[2]}",
-        "Flowcell": parts[2],
-        "Lane": parts[3],
-        "Instrument": parts[0][1:],
+        "RunId": runid,
+        "Flowcell": flowcell,
+        "Lane": lane,
+        "Instrument": instrument,
         "Read1Cycles": f"{readlen}",
         "Index1Cycles": index1len,
         "Index1Reverse": "?",
@@ -181,8 +203,8 @@ def main():
     read2 = args.read2
 
     if not runinfo or "Lane" not in runinfo or "Index1" not in runinfo:
-        runinfo_read1 = make_runinfo_from_read(read1)
-        runinfo_read2 = make_runinfo_from_read(read2)
+        runinfo_read1 = make_runinfo_from_read(read1, check_umi=args.umi)
+        runinfo_read2 = make_runinfo_from_read(read2, check_umi=args.umi)
 
         if (
             runinfo_read1["Lane"] != runinfo_read2["Lane"]

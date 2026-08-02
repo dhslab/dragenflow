@@ -77,19 +77,19 @@ workflow GATHER_ALIGNMENT_SAMPLES {
         ch_crams_to_convert = ch_crams_to_convert.mix(
             ch_sample_alignment_meta
                 .filter{ it.bam || it.cram }
-                .map{ meta -> [ meta.subMap("id", "individual_id", "sample_type", "sample_id", "sex"), file(meta.bam ? "${meta.bam}*" : "${meta.cram}*", checkIfExists: true) ] }
+                .map{ meta -> [ meta.subMap("id", "sample_type", "sample_id", "sex"), file(meta.bam ? "${meta.bam}*" : "${meta.cram}*", checkIfExists: true) ] }
                 .filter{ it != [] }
         )
     } else {
         ch_crams_to_convert = ch_crams_to_convert.mix(
             ch_sample_alignment_meta      
                 .filter{it.bam || it.cram}
-                .map{ meta -> [ meta.subMap("id", "individual_id", "sample_type", "sample_id", "sex"), file(meta.bam ? "${meta.bam}*" : "${meta.cram}*", checkIfExists: true) ] }
+                .map{ meta -> [ meta.subMap("id", "sample_type", "sample_id", "sex"), file(meta.bam ? "${meta.bam}*" : "${meta.cram}*", checkIfExists: true) ] }
                 .filter{it != []}
                 .join(
                     ch_sample_alignment_meta
                         .filter{ it.read1 || it.fastq_list }
-                        .map{ meta -> [ meta.subMap("id", "individual_id", "sample_type", "sample_id", "sex"), 'reads' ] }
+                        .map{ meta -> [ meta.subMap("id", "sample_type", "sample_id", "sex"), 'reads' ] }
                 )
                 .map{ meta, alignments, reads -> [ meta, alignments ] }
                 .filter{it != []}
@@ -127,6 +127,8 @@ workflow GATHER_ALIGNMENT_SAMPLES {
             .map{ meta, read1, read2 -> [ meta, read1, read2, [] ] }
     )
 
+    ch_sample_alignment_meta.dump(tag:'alignment_meta', pretty:true)
+
     //
     // Collect reads, fastq_list, and runinfo.
     //
@@ -135,17 +137,17 @@ workflow GATHER_ALIGNMENT_SAMPLES {
             ch_sample_alignment_meta
                 .filter{ it.read1 && it.read2 }
                 .map{ meta -> 
-                    def newMeta = meta.subMap('id', 'individual_id','sample_type','sample_id','sex')
+                    def newMeta = meta.subMap('id', 'sample_type','sample_id','sex')
                     [ newMeta, file(meta.read1, checkIfExists: true), file(meta.read2, checkIfExists: true), [] ] 
                 },
             ch_sample_alignment_meta
                 .filter{ it.fastq_list }
                 .flatMap{ meta -> 
-                    def newMeta = meta.subMap('id', 'individual_id','sample_type','sample_id','sex')
+                    def newMeta = meta.subMap('id','sample_type','sample_id','sex')
                     def requiredColumns = ['RGID', 'RGSM', 'RGLB', 'Lane', 'Read1File', 'Read2File']
                     def fastq_list = file(meta.fastq_list, checkIfExists: true)                    
                     def data = parseFastqList(fastq_list)
-                    data = data.findAll{ it.RGSM == newMeta.id }                    
+                    data = data.findAll{ it.RGSM == newMeta.sample_id || it.RGSM == newMeta.id }                    
                     data.collect{
                         if (!it.keySet().containsAll(requiredColumns)) {
                             error("Missing required columns in input FastQ list!")
@@ -161,7 +163,7 @@ workflow GATHER_ALIGNMENT_SAMPLES {
                     ch_sample_alignment_meta
                             .filter{ it.demux_path }
                             .map { meta -> 
-                                def newMeta = meta.subMap('id', 'individual_id','sample_type','sample_id','sex')
+                                def newMeta = meta.subMap('id','sample_type','sample_id','sex')
                                 [ newMeta, file(meta.demux_path, checkIfExists: true) ] 
                             }
                 )
@@ -184,6 +186,9 @@ workflow GATHER_ALIGNMENT_SAMPLES {
                 }
                 .filter{ it!= [] }
         )
+
+
+    ch_gathered_fastqs.dump(tag:'gathered_fastqs', pretty:true)
 
     // Adapter trimming and UMI alignment are not compatible.
     // If UMI option is given, then run fastp on FASTQs to trim adapters.     
@@ -275,12 +280,12 @@ workflow PREPARE_SOMATIC_FASTQS {
     
     ch_prepare_somatic_fastqs = ch_prepare_somatic_fastqs_samples.tumor // first get tumor samples
         .map { meta, reads, fastqlist, alignment_files ->
-            [ meta.individual_id, meta, reads, fastqlist ]
+            [ meta.id, meta, reads, fastqlist ]
         }
         .combine( // and join with normal samples
             ch_prepare_somatic_fastqs_samples.normal
             .map { meta, reads, fastqlist, alignment_files ->
-                [ meta.individual_id, meta, reads, fastqlist ]
+                [ meta.id, meta, reads, fastqlist ]
             }, by: 0)
         .map { it -> [ it[1], it[2], it[3], it[4], it[5], it[6] ] }
         // on joined samples, set tumor and normal id to meta and combine reads.
