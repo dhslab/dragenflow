@@ -5,4 +5,6 @@ work/
 testing/
 testing*
 *.pyc
-.dir_bash_history
+test.sh
+clean.sh
+.nextflow*

@@ -12,7 +12,7 @@ process MAKE_HOTSPOT_VCF {
 
     script:
     def args = [
-        bed_file.find{ it ==~ /.*\.(bed)$/ }?.with{ "--bed $it" }                                  ?: "",
+        bed_file.find{ it ==~ /.*\.(bed|bed\.gz)$/ }?.with{ "--bed $it" }                                  ?: "",
         reference.find{ it ==~ /.*\.(fasta|fa)$/ }?.with{ "--fasta $it" }                          ?: ""
     ].join(' ').trim()
     """
