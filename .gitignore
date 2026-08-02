@@ -5,3 +5,4 @@ work/
 testing/
 testing*
 *.pyc
+.dir_bash_history

@@ -13,15 +13,20 @@ process VEP_TO_TSV {
     path "versions.yml", emit: versions
 
     script:
-    def args = [
-     type.toLowerCase() == "vcf" && params.workflow == "somatic" ? "-i 0 1" : "",
-     type.toLowerCase() == "vcf" && params.workflow != "somatic" ? "-i 0" : "",
-     type.toLowerCase() == "sv" ? "-i 1" : "",
-     type.toLowerCase() == "cnv" ? "-i 0" : "",
-     type.toLowerCase() == "vcf" ? "-v" : "",
-     type.toLowerCase() == "cnv" ? "-s" : "",
-     type.toLowerCase() == "sv" ? "-s" : ""
-    ].join(' ').trim()
+    def t = type.toLowerCase()
+    def isSomatic = params.workflow == "somatic"
+    def args = ""
+    switch (t) {
+        case 'vcf':
+            args = "-i ${isSomatic ? '0 1' : '0'} -v"
+            break
+        case 'sv':
+            args = "-i ${isSomatic ? '1' : '0'} -s"
+            break
+        case 'cnv':
+            args = "-i 0 -s"
+            break
+    }
     def vcf = input.find{ it ==~ /.*\.(vcf.gz)$/ } ?: ""
     def output = vcf.getName().replaceFirst('\\.vcf\\.gz\$', '.tsv')
 
@@ -35,15 +40,20 @@ process VEP_TO_TSV {
     """
     
     stub:
-    def args = [
-     type.toLowerCase() == "vcf" && params.workflow == "somatic" ? "-i 0 1" : "",
-     type.toLowerCase() == "vcf" && params.workflow != "somatic" ? "-i 0" : "",
-     type.toLowerCase() == "sv" ? "-i 1" : "",
-     type.toLowerCase() == "cnv" ? "-i 0" : "",
-     type.toLowerCase() == "vcf" ? "-v" : "",
-     type.toLowerCase() == "cnv" ? "-s" : "",
-     type.toLowerCase() == "sv" ? "-s" : ""
-    ].join(' ').trim()
+    def t = type.toLowerCase()
+    def isSomatic = params.workflow == "somatic"
+    def args = ""
+    switch (t) {
+        case 'vcf':
+            args = "-i ${isSomatic ? '0 1' : '0'} -v"
+            break
+        case 'sv':
+            args = "-i ${isSomatic ? '1' : '0'} -s"
+            break
+        case 'cnv':
+            args = "-i 0 -s"
+            break
+    }
     def vcf = input.find{ it ==~ /.*\.(vcf.gz)$/ } ?: ""
     def output = vcf.getName().replaceFirst('\\.vcf\\.gz\$', '.tsv')
 
