@@ -13,12 +13,14 @@ __version__ = "1.0.0"
 
 # --- Helper Functions ---
 
+
 def check_file(path: str) -> Path:
     """Checks if a file path exists and is a file."""
     p = Path(path)
     if not p.is_file():
         raise argparse.ArgumentTypeError(f"File not found: {path}")
     return p
+
 
 def add_sequence_column(row: pd.Series, fasta_handle: pysam.FastaFile) -> str:
     """
@@ -30,8 +32,11 @@ def add_sequence_column(row: pd.Series, fasta_handle: pysam.FastaFile) -> str:
         sequence = fasta_handle.fetch(row["Chromosome"], row["Start"], row["End"])
         return sequence
     except (ValueError, KeyError) as e:
-        print(f"Warning: Could not fetch sequence for {row['Chromosome']}:{row['Start']}-{row['End']}. Reason: {e}", file=sys.stderr)
-        return "N" * (row['End'] - row['Start'])
+        print(
+            f"Warning: Could not fetch sequence for {row['Chromosome']}:{row['Start']}-{row['End']}. Reason: {e}",
+            file=sys.stderr,
+        )
+        return "N" * (row["End"] - row["Start"])
 
 
 def dataframe_to_vcf(df: pd.DataFrame, fasta_handle: pysam.FastaFile) -> str:
@@ -45,25 +50,29 @@ def dataframe_to_vcf(df: pd.DataFrame, fasta_handle: pysam.FastaFile) -> str:
     for contig in fasta_handle.references:
         length = fasta_handle.get_reference_length(contig)
         vcf_lines.append(f"##contig=<ID={contig},length={length}>")
-        
+
     vcf_lines.append("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO")
-    
+
     # Prepare DataFrame for VCF format
     df_vcf = df.copy()
-    df_vcf['#CHROM'] = df_vcf['Chromosome']
-    df_vcf['POS'] = df_vcf['Position'] + 1 # VCF is 1-based
-    df_vcf['ID'] = '.'
-    df_vcf['REF'] = df_vcf['Sequence']
-    df_vcf['ALT'] = '.'  # No alternative allele for a hotspot VCF
-    df_vcf['QUAL'] = '.'
-    df_vcf['FILTER'] = 'PASS'
-    df_vcf['INFO'] = '.'
-    
-    vcf_body = df_vcf[['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO']].to_csv(sep='\t', index=False, header=False)
-    
+    df_vcf["#CHROM"] = df_vcf["Chromosome"]
+    df_vcf["POS"] = df_vcf["Position"] + 1  # VCF is 1-based
+    df_vcf["ID"] = "."
+    df_vcf["REF"] = df_vcf["Sequence"]
+    df_vcf["ALT"] = "."  # No alternative allele for a hotspot VCF
+    df_vcf["QUAL"] = "."
+    df_vcf["FILTER"] = "PASS"
+    df_vcf["INFO"] = "."
+
+    vcf_body = df_vcf[["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"]].to_csv(
+        sep="\t", index=False, header=False
+    )
+
     return "\n".join(vcf_lines) + "\n" + vcf_body
 
+
 # --- Main Application Logic ---
+
 
 def main():
     """
@@ -71,12 +80,14 @@ def main():
     """
     parser = argparse.ArgumentParser(
         description="Prepare a hotspot VCF from a BED file of genomic regions.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--bed", type=check_file, required=True, help="BED file containing hotspot regions.")
-    parser.add_argument("--fasta", type=check_file, required=True, help="Path to the indexed reference genome FASTA file.")
+    parser.add_argument(
+        "--fasta", type=check_file, required=True, help="Path to the indexed reference genome FASTA file."
+    )
     parser.add_argument("--outfile", required=True, help="Output VCF file.")
-    parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = parser.parse_args()
 
     try:
@@ -86,36 +97,29 @@ def main():
 
         # --- 2. Read and Merge Genomic Regions ---
         print(f"Reading and processing BED file: {args.bed}", file=sys.stderr)
-        bed_df = pd.read_csv(args.bed, sep='\t', usecols=[0, 1, 2], names=['Chromosome', 'Start', 'End'])
+        bed_df = pd.read_csv(args.bed, sep="\t", usecols=[0, 1, 2], names=["Chromosome", "Start", "End"])
         merged_df = pr.PyRanges(bed_df).merge().sort().df
 
         # --- 3. Fetch Sequences for Merged Regions ---
         print("Fetching sequences for merged regions...", file=sys.stderr)
-        merged_df['sequences'] = merged_df.apply(
-            lambda row: add_sequence_column(row, fasta_handle), 
-            axis=1
-        )
+        merged_df["sequences"] = merged_df.apply(lambda row: add_sequence_column(row, fasta_handle), axis=1)
 
         # --- 4. Expand Regions into a VCF-like DataFrame (Optimized) ---
         print("Expanding genomic regions into VCF format...", file=sys.stderr)
         all_chroms, all_positions, all_sequences = [], [], []
 
         for _, row in merged_df.iterrows():
-            num_bases = len(row['sequences'])
-            all_chroms.extend([row['Chromosome']] * num_bases)
-            all_positions.extend(range(row['Start'], row['End']))
-            all_sequences.extend(list(row['sequences']))
+            num_bases = len(row["sequences"])
+            all_chroms.extend([row["Chromosome"]] * num_bases)
+            all_positions.extend(range(row["Start"], row["End"]))
+            all_sequences.extend(list(row["sequences"]))
 
-        vcf_df = pd.DataFrame({
-            'Chromosome': all_chroms,
-            'Position': all_positions,
-            'Sequence': all_sequences
-        })
+        vcf_df = pd.DataFrame({"Chromosome": all_chroms, "Position": all_positions, "Sequence": all_sequences})
 
         # --- 5. Convert to VCF and Write to File ---
         result_vcf_str = dataframe_to_vcf(vcf_df, fasta_handle)
         output_filename = f"{args.outfile}"
-    
+
         with open(output_filename, "w") as f:
             f.write(result_vcf_str)
         print(f"Successfully wrote hotspot VCF to '{output_filename}'", file=sys.stderr)
@@ -124,9 +128,9 @@ def main():
         sys.exit(f"An error occurred: {e}")
     finally:
         # Ensure the FASTA file handle is closed
-        if 'fasta_handle' in locals() and fasta_handle:
+        if "fasta_handle" in locals() and fasta_handle:
             fasta_handle.close()
+
 
 if __name__ == "__main__":
     main()
-

@@ -1,10 +1,48 @@
 {
-    "$schema": "http://json-schema.org/draft-07/schema",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://raw.githubusercontent.com/dhslab/dragenflow/master/nextflow_schema.json",
     "title": "dhslab/dragenflow pipeline parameters",
     "description": "Nextflow pipeline for running DRAGEN alignment and variant calling workflows (germline, somatic, RNA-seq, methylation).",
     "type": "object",
-    "definitions": {
+    "allOf": [
+        {
+            "$ref": "#/$defs/input_output_options"
+        },
+        {
+            "$ref": "#/$defs/workflow_options"
+        },
+        {
+            "$ref": "#/$defs/dragen_alignment_options"
+        },
+        {
+            "$ref": "#/$defs/dragen_variant_calling_options"
+        },
+        {
+            "$ref": "#/$defs/dragen_umi_options"
+        },
+        {
+            "$ref": "#/$defs/dragen_rna_options"
+        },
+        {
+            "$ref": "#/$defs/annotation_options"
+        },
+        {
+            "$ref": "#/$defs/compute_options"
+        },
+        {
+            "$ref": "#/$defs/reference_genome_options"
+        },
+        {
+            "$ref": "#/$defs/institutional_config_options"
+        },
+        {
+            "$ref": "#/$defs/max_job_request_options"
+        },
+        {
+            "$ref": "#/$defs/generic_options"
+        }
+    ],
+    "$defs": {
         "input_output_options": {
             "title": "Input/output options",
             "type": "object",
@@ -15,6 +53,7 @@
                 "input": {
                     "type": "string",
                     "format": "file-path",
+                    "mimetype": "text/csv",
                     "description": "Path to samplesheet CSV file. Supports reads (read1/read2), BAM/CRAM, fastq_list, demux_path, or samplemap columns. See README for format details.",
                     "fa_icon": "fas fa-file-csv"
                 },
@@ -273,6 +312,11 @@
                     "description": "UMI library type passed to --umi-library-type. Set to 'random-simplex' for IDT UDI-UMI libraries. When set, duplicate marking is typically disabled and adapters are trimmed with fastp before DRAGEN.",
                     "fa_icon": "fas fa-barcode"
                 },
+                "illumina_conversion": {
+                    "type": "boolean",
+                    "description": "Treat reads as Illumina 5-base (methylation-aware) UMI data, enabling the same DRAGEN UMI arguments as --umi without requiring a library type string. Set automatically by the fivebase profile.",
+                    "fa_icon": "fas fa-barcode"
+                },
                 "readfamilysize": {
                     "type": "integer",
                     "default": 3,
@@ -382,7 +426,6 @@
                     "description": "SLURM account for compute2 job submission.",
                     "fa_icon": "fas fa-server"
                 },
-
                 "apptainer_cache": {
                     "type": "string",
                     "format": "directory-path",
@@ -615,19 +658,5 @@
                 }
             }
         }
-    },
-    "allOf": [
-        { "$ref": "#/definitions/input_output_options" },
-        { "$ref": "#/definitions/workflow_options" },
-        { "$ref": "#/definitions/dragen_alignment_options" },
-        { "$ref": "#/definitions/dragen_variant_calling_options" },
-        { "$ref": "#/definitions/dragen_umi_options" },
-        { "$ref": "#/definitions/dragen_rna_options" },
-        { "$ref": "#/definitions/annotation_options" },
-        { "$ref": "#/definitions/compute_options" },
-        { "$ref": "#/definitions/reference_genome_options" },
-        { "$ref": "#/definitions/institutional_config_options" },
-        { "$ref": "#/definitions/max_job_request_options" },
-        { "$ref": "#/definitions/generic_options" }
-    ]
+    }
 }

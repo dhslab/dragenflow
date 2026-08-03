@@ -34,20 +34,19 @@ Read2File: <read2 file path>
 
 """
 
+
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description="Prepare fastq_list.csv file from a passed list file or reads. If a Runparameters.xml file is passed, additional metadata is added."
     )
     parser.add_argument("-i", "--id", type=str, required=True, help="Sample ID")
-    parser.add_argument("--umi", action="store_true", help="Indicate if UMIs are used") # This is to check for multiple RGLB for the same sample when UMIs are used
+    parser.add_argument(
+        "--umi", action="store_true", help="Indicate if UMIs are used"
+    )  # This is to check for multiple RGLB for the same sample when UMIs are used
     parser.add_argument("-1", "--read1", type=check_file, help="Path to read1")
     parser.add_argument("-2", "--read2", type=check_file, help="Path to read2")
-    parser.add_argument(
-        "-r", "--runinfo", type=str, help="Path to Illumina RunParameters.xml file"
-    )
-    parser.add_argument(
-        "-v", "--version", action="version", version="%(prog)s: " + __version__
-    )
+    parser.add_argument("-r", "--runinfo", type=str, help="Path to Illumina RunParameters.xml file")
+    parser.add_argument("-v", "--version", action="version", version="%(prog)s: " + __version__)
 
     return parser.parse_args()
 
@@ -76,36 +75,36 @@ def make_runinfo_from_read(readpath, check_umi=False):
     index2len = "?"
     indexes = readName.split(" ")
     readlen = "?"
-    
+
     parts = readName.split(":")
-    
+
     if len(parts) >= 4:
         flowcell = parts[2]
         lane = parts[3]
         instrument = parts[0][1:]
         runid = f"RUN_{parts[0][1:]}_{str(int(parts[1])).zfill(4)}_{parts[2]}"
 
-    # Index 
+    # Index
     indexlist = []
     seqlist = []
-    index_chars = set('ACGT+')
+    index_chars = set("ACGT+")
 
     # if args.umi is True, check that there are UMIs in the last part of the read name by testing for non ACTGN+ characters in parts[-1]
     if check_umi and len(set(parts[-1]) - index_chars) > 0:
         # No UMIs found, error
         print(f"UMIs are indicated, but no UMIs found in read name: {readName}")
         sys.exit(1)
-    
+
     # if indexes are present in the read header, get the first 100
-    # and find the most common one (to account for mismatches/errors in index read)    
+    # and find the most common one (to account for mismatches/errors in index read)
     with gzip.open(readpath, "rt") as file:
         for i, line in enumerate(file):
             if i % 4 == 0:  # Read names are on every 4th line starting from 0
-                read_name = line.strip()                
+                read_name = line.strip()
                 indexes = read_name.split(" ")
                 if len(indexes) > 1:
                     index = indexes[1].split(":")[-1]
-                    if not 'N' in index and len(set(index) - index_chars) == 0:
+                    if not "N" in index and len(set(index) - index_chars) == 0:
                         indexlist = indexlist + [index]
 
             if i > 0 and i % 1 == 0:
@@ -155,6 +154,7 @@ def make_runinfo_from_read(readpath, check_umi=False):
 
     return runinfo
 
+
 def make_runinfo_from_run_parameters(filepath):
     runinfo = {}
 
@@ -178,9 +178,7 @@ def make_runinfo_from_run_parameters(filepath):
             elif el2.text == "Reagent":
                 runinfo["ReagentLot"] = el.find("LotNumber").text
 
-    runinfo["Instrument"] = "".join(
-        [runinfo.get("Instrument") or "?", runinfo.get("Side") or "?"]
-    )
+    runinfo["Instrument"] = "".join([runinfo.get("Instrument") or "?", runinfo.get("Side") or "?"])
 
     return runinfo
 
@@ -193,9 +191,7 @@ def main():
     if args.runinfo:
         runparams_path = args.runinfo
         if not os.path.exists(runparams_path):
-            raise ValueError(
-                "RunParameters.xml file not found."
-        )
+            raise ValueError("RunParameters.xml file not found.")
 
         runinfo = make_runinfo_from_run_parameters(runparams_path)
 
@@ -219,15 +215,9 @@ def main():
             if key not in runinfo:
                 runinfo[key] = value
 
-    
+    fqlistout = pd.DataFrame(columns=["RGID", "RGSM", "RGLB", "Lane", "RGPL", "Read1File", "Read2File"])
 
-    fqlistout = pd.DataFrame(
-        columns=["RGID", "RGSM", "RGLB", "Lane", "RGPL", "Read1File", "Read2File"]
-    )
-
-    rgid = ".".join(
-        [runinfo["Flowcell"], runinfo["Index1"], runinfo["Index2"], runinfo["Lane"]]
-    )
+    rgid = ".".join([runinfo["Flowcell"], runinfo["Index1"], runinfo["Index2"], runinfo["Lane"]])
     rglb = ".".join([args.id, runinfo["Index1"], runinfo["Index2"]])
     rgpl = (
         f"{runinfo['RunId']}."
@@ -253,7 +243,6 @@ def main():
     ]
 
     fqlistout.to_csv(f"{args.id}.fastq_list.csv", index=False)
-
 
 
 if __name__ == "__main__":
