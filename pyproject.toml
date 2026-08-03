@@ -3,7 +3,11 @@
 [tool.black]
 line-length = 120
 target_version = ["py37", "py38", "py39", "py310"]
-
+extend-exclude = '''
+/(
+    modules/nf-core
+)/
+'''
 [tool.isort]
 profile = "black"
 known_first_party = ["nf_core"]
