@@ -58,7 +58,7 @@ process DRAGEN_MULTIALIGN {
     def alignment_params = [
         task.ext.dragen_args                          ?: "",
         params.extra_dragen_args                      ?: "",
-        task.ext.dragen_license_args                  ?: "",
+        (task.ext.dragen_user && task.ext.dragen_password) ? "--lic-server 'https://${task.ext.dragen_user}:${task.ext.dragen_password}@license.dragen.illumina.com'" : "",
         "--enable-duplicate-marking ${params.mark_duplicates}",
         intermediate_directory                        ? "--intermediate-results-dir ${intermediate_directory}"                : "",
         intermediate_directory_value                  ? "--intermediate-results-dir ${intermediate_directory_value}"          : "",
@@ -105,7 +105,7 @@ process DRAGEN_MULTIALIGN {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        dragen: \$(${task.ext.dragen_exe_path}/dragen --version | tail -n 1 | cut -d ' ' -f 3)
+        dragen: \$(${exe_path}/bin/dragen --version | tail -n 1 | cut -d ' ' -f 3)
     END_VERSIONS
     """
 

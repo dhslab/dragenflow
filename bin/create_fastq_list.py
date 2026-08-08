@@ -40,9 +40,7 @@ def parse_arguments():
         description="Prepare fastq_list.csv file from a passed list file or reads. If a Runparameters.xml file is passed, additional metadata is added."
     )
     parser.add_argument("-i", "--id", type=str, required=True, help="Sample ID")
-    parser.add_argument(
-        "--umi", action="store_true", help="Indicate if UMIs are used"
-    )  # This is to check for multiple RGLB for the same sample when UMIs are used
+    parser.add_argument("--umi", action="store_true", help="Indicate if UMIs are used")  # This is to check for multiple RGLB for the same sample when UMIs are used
     parser.add_argument("-1", "--read1", type=check_file, help="Path to read1")
     parser.add_argument("-2", "--read2", type=check_file, help="Path to read2")
     parser.add_argument("-r", "--runinfo", type=str, help="Path to Illumina RunParameters.xml file")

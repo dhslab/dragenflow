@@ -17,6 +17,7 @@ process CREATE_FASTQ_LIST {
     def fastq_list_args = [
         read1file  ? "--read1 ${read1file}"      : "",
         read2file  ? "--read2 ${read2file}"      : "",
+        (params.umi || params.illumina_conversion) ? "--umi" : "",
         runinfo    ? "--runinfo ${runinfo}"      : ""
     ].join(' ').trim()
     """
@@ -35,6 +36,7 @@ process CREATE_FASTQ_LIST {
     def fastq_list_args = [
         read1file  ? "--read1 ${read1file}"      : "",
         read2file  ? "--read2 ${read2file}"      : "",
+        (params.umi || params.illumina_conversion) ? "--umi" : "",
         runinfo    ? "--runinfo ${runinfo}"      : "",
     ].join(' ').trim()
     """

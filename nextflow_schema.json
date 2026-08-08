@@ -48,7 +48,7 @@
             "type": "object",
             "fa_icon": "fas fa-terminal",
             "description": "Define where the pipeline should find input data and save output data.",
-            "required": ["input", "outdir"],
+            "required": ["outdir"],
             "properties": {
                 "input": {
                     "type": "string",
@@ -99,7 +99,7 @@
                 "workflow": {
                     "type": "string",
                     "description": "Analysis workflow mode. Typically set by the analysis profile rather than on the command line.",
-                    "enum": ["align", "germline", "somatic", "tumor", "rna", "bsseq"],
+                    "enum": ["align", "germline", "somatic", "tumor", "rna", "bsseq","download_nirvana"],
                     "fa_icon": "fas fa-sitemap"
                 },
                 "run_dragen": {

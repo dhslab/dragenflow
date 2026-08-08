@@ -18,6 +18,7 @@ nextflow.enable.dsl = 2
 */
 
 include { DRAGENFLOW } from './workflows/dragenflow.nf'
+include { NIRVANA    } from './workflows/nirvana.nf'
 include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_dragenflow_pipeline'
 include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_dragenflow_pipeline'
 
@@ -50,6 +51,7 @@ workflow NF_DRAGENFLOW {
 workflow {
     main:
     ch_versions = Channel.empty()
+    ch_multiqc_reports = Channel.value([])
 
     //
     // SUBWORKFLOW: Run initialisation tasks
@@ -66,17 +68,23 @@ workflow {
     )
     ch_versions = ch_versions.mix(PIPELINE_INITIALISATION.out.versions)
 
-    NF_DRAGENFLOW (PIPELINE_INITIALISATION.out.input)
-    ch_versions = ch_versions.mix(NF_DRAGENFLOW.out.versions)
+    if (params.workflow == "download_nirvana") {
+        NIRVANA ()
 
-        PIPELINE_COMPLETION (
+    } else {
+        NF_DRAGENFLOW (PIPELINE_INITIALISATION.out.input)
+        ch_versions = ch_versions.mix(NF_DRAGENFLOW.out.versions)
+        ch_multiqc_reports = NF_DRAGENFLOW.out.multiqc_report
+    }
+
+    PIPELINE_COMPLETION (
         params.email,
         params.email_on_fail,
         params.plaintext_email,
         params.outdir,
         params.monochrome_logs,
         params.hook_url,
-        NF_DRAGENFLOW.out.multiqc_report
+        ch_multiqc_reports
     )
 
 }
