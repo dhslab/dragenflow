@@ -8,11 +8,6 @@ process DOWNLOAD_NIRVANA {
 
     script:
     def exe_path = "${task.ext.dragen_path}"
-    def dragen_params = [
-        task.ext.dragen_args                          ?: "",
-        params.extra_dragen_args                      ?: "",
-        params.nirvana_assembly                       ? "-r ${params.nirvana_assembly} --versions-config /opt/edico/resources/annotation/all_annotations_${params.nirvana_assembly}.json" : ""
-    ].join(' ').trim()
 
     """
     cat > credentials.json << EOF
@@ -22,7 +17,11 @@ process DOWNLOAD_NIRVANA {
     }
     EOF
     mkdir nirvana_annotation_data
-    ${exe_path}/share/nirvana/DataManager download --credentials-file credentials.json ${dragen_params} \\
+    ${exe_path}/share/nirvana/DataManager download -r ${params.nirvana_assembly} --credentials-file credentials.json \\
+    --versions-config /opt/edico/resources/annotation/all_annotations_${params.nirvana_assembly}.json \\
+    -d nirvana_annotation_data
+    ${exe_path}/share/nirvana/DataManager download -r ${params.nirvana_assembly} --credentials-file credentials.json \\
+    --versions-config /opt/edico/resources/annotation/germline_tagging_annotations_${params.nirvana_assembly}.json \\
     -d nirvana_annotation_data
 
     cat <<-END_VERSIONS > versions.yml
@@ -35,8 +34,6 @@ process DOWNLOAD_NIRVANA {
     def exe_path = "${task.ext.dragen_path}"
 
     def dragen_params = [
-        task.ext.dragen_args                          ?: "",
-        params.extra_dragen_args                      ?: "",
         params.nirvana_assembly                       ? "-r ${params.nirvana_assembly} --versions-config /opt/edico/resources/annotation/all_annotations_${params.nirvana_assembly}.json" : ""
     ].join(' ').trim()
 
