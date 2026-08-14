@@ -127,6 +127,19 @@ nextflow run dhslab/dragenflow -r main \
 
 Uses a methylation-specific DRAGEN reference directory (`dragen_hg38_5mCv4.3.6`).
 
+### `download_nirvana`
+
+Not a samplesheet-driven analysis mode — downloads the Nirvana annotation data bundle used by `--use_nirvana`/`--nirvana_path` instead of running alignment or variant calling. Set with `--workflow download_nirvana` directly (there is no dedicated profile) and no `--input` is required:
+
+```bash
+nextflow run dhslab/dragenflow -r main \
+  -profile dhslab,ris2,dragen4 \
+  --workflow download_nirvana \
+  --outdir /path/to/nirvana_annotation_data
+```
+
+The downloaded data lands in `<outdir>/nirvana_annotation_data` and can be pointed to via `--nirvana_path` in subsequent runs. `--nirvana_assembly` (default `GRCh38`) selects which assembly's annotation bundle is fetched.
+
 ### `idtumi`
 
 UMI-aware adapter processing using IDT UDI-UMI (10x19) format. Disables duplicate marking (UMI deduplication is used instead). Combine with another analysis profile for variant calling.
@@ -328,6 +341,8 @@ nextflow run main.nf -profile stub,alignonly -stub-run \
   --input assets/stub/cram_fastq_wgs_mastersheet.csv \
   --outdir results_test
 ```
+
+> Nextflow's `-stub-run`/`-stub` flag has a known quirk where it also populates the pipeline's positional-argument list, producing a harmless `WARN: nf-core pipelines do not accept positional arguments. The positional argument \`true\` has been detected.` on every stub run. This is a Nextflow CLI parsing artifact, not a real usage mistake, and can be ignored.
 
 ### Example runs against real DRAGEN hardware
 

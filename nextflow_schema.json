@@ -308,8 +308,9 @@
             "description": "Options for UMI-based library processing and deduplication.",
             "properties": {
                 "umi": {
-                    "type": "string",
-                    "description": "UMI library type passed to --umi-library-type. Set to 'random-simplex' for IDT UDI-UMI libraries. When set, duplicate marking is typically disabled and adapters are trimmed with fastp before DRAGEN.",
+                    "type": ["boolean", "string"],
+                    "default": false,
+                    "description": "UMI library type passed to --umi-library-type. Set to 'random-simplex' for IDT UDI-UMI libraries (or use the idtumi profile). When set, duplicate marking is typically disabled and adapters are trimmed with fastp before DRAGEN. Leave as false to disable.",
                     "fa_icon": "fas fa-barcode"
                 },
                 "illumina_conversion": {
