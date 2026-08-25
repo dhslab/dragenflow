@@ -23,6 +23,9 @@ process DOWNLOAD_NIRVANA {
     ${exe_path}/share/nirvana/DataManager download -r ${params.nirvana_assembly} --credentials-file credentials.json \\
     --versions-config /opt/edico/resources/annotation/germline_tagging_annotations_${params.nirvana_assembly}.json \\
     -d nirvana_annotation_data
+    ${exe_path}/share/nirvana/DataManager download -r ${params.nirvana_assembly} --credentials-file credentials.json \\
+    --versions-config /opt/edico/resources/annotation/tmb_annotations_${params.nirvana_assembly}.json \\
+    -d nirvana_annotation_data
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

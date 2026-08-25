@@ -99,7 +99,7 @@
                 "workflow": {
                     "type": "string",
                     "description": "Analysis workflow mode. Typically set by the analysis profile rather than on the command line.",
-                    "enum": ["align", "germline", "somatic", "tumor", "rna", "bsseq","download_nirvana"],
+                    "enum": ["align", "germline", "somatic", "tumor", "rna", "bsseq","download_nirvana", "build_hash"],
                     "fa_icon": "fas fa-sitemap"
                 },
                 "run_dragen": {

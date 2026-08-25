@@ -17,8 +17,9 @@ nextflow.enable.dsl = 2
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { DRAGENFLOW } from './workflows/dragenflow.nf'
-include { NIRVANA    } from './workflows/nirvana.nf'
+include { DRAGENFLOW    } from './workflows/dragenflow.nf'
+include { NIRVANA       } from './workflows/nirvana.nf'
+include { BUILD_HASH    } from './workflows/build_hash.nf'
 include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_dragenflow_pipeline'
 include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_dragenflow_pipeline'
 
@@ -71,6 +72,13 @@ workflow {
     if (params.workflow == "download_nirvana") {
         NIRVANA ()
 
+    } else if (params.workflow == "build_hash") {
+        BUILD_HASH (params.fasta)
+
+    } else if (params.workflow == "dragenflow") {
+        NF_DRAGENFLOW (PIPELINE_INITIALISATION.out.input)
+        ch_versions = ch_versions.mix(NF_DRAGENFLOW.out.versions)
+        ch_multiqc_reports = NF_DRAGENFLOW.out.multiqc_report
     } else {
         NF_DRAGENFLOW (PIPELINE_INITIALISATION.out.input)
         ch_versions = ch_versions.mix(NF_DRAGENFLOW.out.versions)
