@@ -13,8 +13,17 @@ process DRAGEN_HASH {
     def exe_path = "${task.ext.dragen_path}"
     def args_license = (task.ext.dragen_user && task.ext.dragen_password) ? "--lic-server 'https://${task.ext.dragen_user}:${task.ext.dragen_password}@license.dragen.illumina.com'" : ""
 
+    def dragen_hash_cmd = [
+        params.build_rna_hash_table ? "--ht-build-rna-hashtable true" : "",
+        params.build_hla_hash_table ? "--ht-build-hla-hashtable true" : "",
+        params.build_methylation_hash_table ? "--ht-num-threads 40 --ht-seed-len 27 --ht-methylated-combined=true" : "",
+        params.build_cnv_hash_table ? "--ht-build-cnv-hashtable true" : "",
+        params.build_legacy_cnv_hash_table ? "--enable-cnv true" : ""
+    ].findAll { it!= "" }.join(" ").trim()
+
     """
-    ${exe_path}/bin/dragen --build-hash-table true --output-directory dragen_hash --ht-reference ${fasta} --ht-build-rna-hashtable true --ht-build-hla-hashtable true --ht-methylated-cg true --ht-build-cnv-hashtable true ${args_license}
+    mkdir dragen_hash
+    ${exe_path}/bin/dragen --build-hash-table true --output-directory dragen_hash --ht-reference ${fasta} ${dragen_hash_cmd} ${args_license}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -26,9 +35,17 @@ process DRAGEN_HASH {
     def exe_path = "${task.ext.dragen_path}"
     def args_license = (task.ext.dragen_user && task.ext.dragen_password) ? "--lic-server 'https://${task.ext.dragen_user}:${task.ext.dragen_password}@license.dragen.illumina.com'" : ""
 
+    def dragen_hash_cmd = [
+        params.build_rna_hash_table ? "--ht-build-rna-hashtable true" : "",
+        params.build_hla_hash_table ? "--ht-build-hla-hashtable true" : "",
+        params.build_methylation_hash_table ? "--ht-num-threads 40 --ht-seed-len 27 --ht-methylated-combined=true" : "",
+        params.build_cnv_hash_table ? "--ht-build-cnv-hashtable true" : "",
+        params.build_legacy_cnv_hash_table ? "--enable-cnv true" : ""
+    ].findAll { it!= "" }.join(" ").trim()
+
     """
     mkdir dragen_hash
-    echo ${exe_path}/bin/dragen --build-hash-table true --output-directory dragen_hash --ht-reference ${fasta} --ht-build-rna-hashtable true --ht-build-hla-hashtable true --ht-methylated-cg true --ht-build-cnv-hashtable true ${args_license} > dragen_hash/dragen_command.txt
+    echo ${exe_path}/bin/dragen --build-hash-table true --output-directory dragen_hash --ht-reference ${fasta} ${dragen_hash_cmd} ${args_license} > dragen_hash/dragen_command.txt
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
